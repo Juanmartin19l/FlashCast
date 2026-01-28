@@ -63,9 +63,7 @@ class EnviadorMensajes:
             fg="black",
         )
         self.texto_mensaje.pack(fill="both", expand=True, pady=5)
-        self.texto_mensaje.insert(
-            "1.0", "¡ATENCIÓN! Revisar Microsoft Teams ahora mismo."
-        )
+        self.texto_mensaje.insert("1.0", "¡ATENCIÓN! ")
 
         # Botón de enviar
         self.boton_enviar = tk.Button(
@@ -134,7 +132,8 @@ class EnviadorMensajes:
             try:
                 with open(ARCHIVO_HISTORIAL, "r") as f:
                     return json.load(f)
-            except:
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"Error cargando historial: {e}")
                 return {}
         return {}
 
@@ -143,8 +142,8 @@ class EnviadorMensajes:
         try:
             with open(ARCHIVO_HISTORIAL, "w") as f:
                 json.dump(self.historial_ips, f, indent=2)
-        except:
-            pass
+        except (IOError, OSError) as e:
+            print(f"Error guardando historial: {e}")
 
     def agregar_log(self, texto):
         """Agrega una línea al log de forma segura desde cualquier hilo"""
@@ -194,8 +193,12 @@ class EnviadorMensajes:
                     self.root.after(0, self.actualizar_contador)
 
                 return True
-        except:
+        except (socket.timeout, ConnectionRefusedError, OSError):
+            # IP no disponible o no escucha en el puerto
             pass
+        except Exception as e:
+            # Error inesperado, registrar para depuración
+            print(f"Error inesperado enviando a {ip}: {e}")
         return False
 
     def obtener_mi_red(self):
@@ -226,7 +229,12 @@ class EnviadorMensajes:
         self.agregar_log("-" * 50)
 
         # Primero enviar a IPs conocidas (del historial)
-        ips_conocidas = [ipaddress.ip_address(ip) for ip in self.historial_ips.keys()]
+        ips_conocidas = []
+        for ip_str in self.historial_ips.keys():
+            try:
+                ips_conocidas.append(ipaddress.ip_address(ip_str))
+            except ValueError:
+                print(f"IP inválida en historial: {ip_str}")
 
         if ips_conocidas:
             self.agregar_log(
