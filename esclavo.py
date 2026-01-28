@@ -110,6 +110,16 @@ def mostrar_alerta(mensaje):
     )
     boton.pack(pady=20)
 
+    # Nota de contacto
+    nota_contacto = tk.Label(
+        root,
+        text="Cualquier consulta comunicarse con el departamento de coordinación",
+        font=font.Font(size=16, slant="italic"),
+        fg="white",
+        bg="red",
+    )
+    nota_contacto.pack(pady=15)
+
     # También permitir Enter para confirmar
     entry.bind("<Return>", verificar_confirmacion)
 

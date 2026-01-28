@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📢 Panel de Envío de Mensajes</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1>📢 Panel de Envío de Mensajes</h1>
+      <p class="subtitle">Sistema de notificaciones en red local</p>
+    </header>
+
+    <div class="content">
+      <div class="mensaje-section">
+        <h2>Escribe tu mensaje</h2>
+        <textarea id="mensaje"
+          placeholder="Escribe aquí el mensaje que deseas enviar a todos los equipos...">¡ATENCIÓN! </textarea>
+
+        <button id="btnEnviar" class="btn-enviar">
+          📤 ENVIAR MENSAJE A TODA LA RED
+        </button>
+
+        <button id="btnCancelar" class="btn-cancelar" style="display: none;">
+          🛑 CANCELAR ENVÍO
+        </button>
+
+        <div id="estado" class="estado">
+          <span class="status-icon">✓</span>
+          <span class="status-text">Listo para enviar</span>
+        </div>
+
+        <div class="estadisticas">
+          <div class="stat-card">
+            <div class="stat-icon">📊</div>
+            <div class="stat-content">
+              <div class="stat-label">Mensajes enviados</div>
+              <div id="contador" class="stat-value">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📚</div>
+            <div class="stat-content">
+              <div class="stat-label">IPs en historial</div>
+              <div id="historial" class="stat-value">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="log-section">
+        <h2>📋 Log de IPs alcanzadas</h2>
+        <div id="log" class="log-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>

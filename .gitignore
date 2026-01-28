@@ -1,1 +1,3 @@
 historial_ips.json
+.venv/
+__pycache__/
