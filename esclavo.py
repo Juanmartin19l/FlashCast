@@ -178,12 +178,15 @@ def mostrar_alerta(mensaje):
 
     # Vincular la rueda del mouse CORRECTAMENTE
     def on_mousewheel(event):
-        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        # Scroll solo si hay contenido que scrollear
+        if contenido_height > canvas.winfo_height():
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
-    # Usar bind() en lugar de bind_all() para evitar conflictos
-    # Vincular al canvas y al frame de contenido
-    canvas.bind("<MouseWheel>", on_mousewheel)
-    contenido_frame.bind("<MouseWheel>", on_mousewheel)
+    # Asegurar que el canvas tenga el foco y pueda recibir eventos
+    canvas.focus_set()
+
+    # Vincular al canvas para capturar eventos de scroll
+    canvas.bind_all("<MouseWheel>", on_mousewheel)
 
     # Empaquetar canvas y scrollbar
     canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
