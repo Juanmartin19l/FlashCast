@@ -1,3 +1,5 @@
 historial_ips.json
 .venv/
 __pycache__/
+dist/
+build/
