@@ -14,6 +14,7 @@ PUERTO = 5000
 TIMEOUT = 0.3
 MAX_HILOS = 500
 ARCHIVO_HISTORIAL = "historial_ips.json"
+MAX_CARACTERES = 2048  # Límite de caracteres del mensaje
 
 app = Flask(__name__)
 
@@ -178,6 +179,18 @@ def enviar_mensaje():
 
     if not mensaje:
         return jsonify({"error": "Debes escribir un mensaje"}), 400
+
+    # Validar longitud del mensaje en bytes (UTF-8)
+    mensaje_bytes = len(mensaje.encode("utf-8"))
+    if mensaje_bytes > MAX_CARACTERES:
+        return (
+            jsonify(
+                {
+                    "error": f"El mensaje es demasiado largo. Máximo {MAX_CARACTERES} bytes. Tu mensaje tiene {mensaje_bytes} bytes."
+                }
+            ),
+            400,
+        )
 
     # Ejecutar en hilo separado
     threading.Thread(target=iniciar_bombardeo, args=(mensaje,), daemon=True).start()

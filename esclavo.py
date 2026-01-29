@@ -178,12 +178,12 @@ def mostrar_alerta(mensaje):
         bg="#7DC4F5",
         fg=COLOR_BLANCO,
         relief=tk.FLAT,
-        padx=35,
-        pady=12,
+        padx=20,
+        pady=8,
         cursor="hand2",
         activebackground="#6AB3E4",
     )
-    boton.pack(side=tk.RIGHT)
+    boton.pack(side=tk.RIGHT, fill=tk.Y)
 
     # Mensaje de error
     error_label = tk.Label(
@@ -194,7 +194,7 @@ def mostrar_alerta(mensaje):
         bg=COLOR_BLANCO,
         anchor="w",
     )
-    error_label.pack(fill=tk.X, pady=(0, 10))
+    error_label.pack(fill=tk.X, pady=(0, 5))
 
     # Nota de contacto
     nota_contacto = tk.Label(
@@ -204,7 +204,7 @@ def mostrar_alerta(mensaje):
         fg="#888888",
         bg=COLOR_BLANCO,
     )
-    nota_contacto.pack(pady=(5, 0))
+    nota_contacto.pack(pady=(0, 0))
 
     # Permitir Enter para confirmar
     entry.bind("<Return>", verificar_confirmacion)
@@ -227,7 +227,7 @@ def iniciar_cliente():
 
     while True:
         conn, addr = server.accept()
-        mensaje = conn.recv(1024).decode("utf-8")
+        mensaje = conn.recv(2048).decode("utf-8")
         if mensaje:
             mostrar_alerta(mensaje)
         conn.close()
