@@ -133,9 +133,13 @@ def mostrar_alerta(mensaje):
         bg=COLOR_BLANCO,
     ).pack(side=tk.LEFT)
 
+    # Frame para campo de texto y botón (en la misma línea)
+    input_frame = tk.Frame(main_frame, bg=COLOR_BLANCO)
+    input_frame.pack(fill=tk.X, pady=(0, 5))
+
     # Campo de texto con borde
-    entry_frame = tk.Frame(main_frame, bg="#CCCCCC", bd=1)
-    entry_frame.pack(fill=tk.X, pady=(0, 5))
+    entry_frame = tk.Frame(input_frame, bg="#CCCCCC", bd=1)
+    entry_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
 
     entry = tk.Entry(
         entry_frame,
@@ -155,17 +159,6 @@ def mostrar_alerta(mensaje):
     entry_var.trace("w", a_mayusculas)
     entry.config(textvariable=entry_var)
 
-    # Mensaje de error
-    error_label = tk.Label(
-        main_frame,
-        text="",
-        font=font.Font(family="Segoe UI", size=10),
-        fg=COLOR_ERROR,
-        bg=COLOR_BLANCO,
-        anchor="w",
-    )
-    error_label.pack(fill=tk.X, pady=(0, 10))
-
     def verificar_confirmacion(event=None):
         texto = entry.get().strip().upper()
         if texto == "CONFIRMAR":
@@ -176,13 +169,9 @@ def mostrar_alerta(mensaje):
             )
             entry.delete(0, tk.END)
 
-    # Frame para botón y nota
-    bottom_frame = tk.Frame(main_frame, bg=COLOR_BLANCO)
-    bottom_frame.pack(fill=tk.X, pady=(5, 0))
-
-    # Botón confirmar
+    # Botón confirmar al lado del textbox
     boton = tk.Button(
-        bottom_frame,
+        input_frame,
         text="Confirmar y Cerrar",
         command=verificar_confirmacion,
         font=font.Font(family="Segoe UI", size=12, weight="bold"),
@@ -195,6 +184,27 @@ def mostrar_alerta(mensaje):
         activebackground="#6AB3E4",
     )
     boton.pack(side=tk.RIGHT)
+
+    # Mensaje de error
+    error_label = tk.Label(
+        main_frame,
+        text="",
+        font=font.Font(family="Segoe UI", size=10),
+        fg=COLOR_ERROR,
+        bg=COLOR_BLANCO,
+        anchor="w",
+    )
+    error_label.pack(fill=tk.X, pady=(0, 10))
+
+    # Nota de contacto
+    nota_contacto = tk.Label(
+        main_frame,
+        text="Cualquier consulta comunicarse con el departamento de coordinación",
+        font=font.Font(family="Segoe UI", size=10, slant="italic"),
+        fg="#888888",
+        bg=COLOR_BLANCO,
+    )
+    nota_contacto.pack(pady=(5, 0))
 
     # Permitir Enter para confirmar
     entry.bind("<Return>", verificar_confirmacion)
