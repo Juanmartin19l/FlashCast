@@ -1,7 +1,43 @@
 import socket
 import tkinter as tk
 from tkinter import font
-import re
+import logging
+import threading
+import signal
+import sys
+import os
+from datetime import datetime
+
+
+# Configuración de logging
+def configurar_logging():
+    """Configura el sistema de logging para producción"""
+    log_dir = os.path.join(os.path.dirname(__file__), "logs")
+    os.makedirs(log_dir, exist_ok=True)
+
+    log_file = os.path.join(log_dir, f"esclavo_{datetime.now().strftime('%Y%m%d')}.log")
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=[logging.FileHandler(log_file), logging.StreamHandler()],
+    )
+    return logging.getLogger(__name__)
+
+
+logger = configurar_logging()
+
+# Configuración global
+CONFIG = {
+    "HOST": os.getenv("ESCLAVO_HOST", "0.0.0.0"),
+    "PORT": int(os.getenv("ESCLAVO_PORT", "5000")),
+    "TIMEOUT": int(os.getenv("ESCLAVO_TIMEOUT", "30")),
+    "MAX_BUFFER": int(os.getenv("ESCLAVO_MAX_BUFFER", "8192")),
+    "CONFIRMATION_WORD": os.getenv("CONFIRMATION_WORD", "CONFIRMAR"),
+}
+
+server_running = True
+server_socket = None
 
 
 def mostrar_alerta(mensaje):
@@ -47,11 +83,11 @@ def mostrar_alerta(mensaje):
     banner.pack(fill=tk.X, pady=(0, 20))
 
     # Frame externo para el mensaje con sombra
-    mensaje_outer_frame = tk.Frame(main_frame, bg="#D0D0D0", relief=tk.FLAT)
+    mensaje_outer_frame = tk.Frame(main_frame, bg="#D0D0D0")
     mensaje_outer_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
 
     # Frame interno del mensaje con diseño mejorado
-    mensaje_frame = tk.Frame(mensaje_outer_frame, bg="#FFFFFF", relief=tk.FLAT)
+    mensaje_frame = tk.Frame(mensaje_outer_frame, bg="#FFFFFF")
     mensaje_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
 
     # Canvas con scrollbar para mensajes largos
@@ -59,25 +95,21 @@ def mostrar_alerta(mensaje):
     scrollbar = tk.Scrollbar(mensaje_frame, orient="vertical", command=canvas.yview)
 
     # Frame para el contenido del mensaje dentro del canvas
-    contenido_frame = tk.Frame(canvas, bg="#FFFFFF", relief=tk.FLAT)
+    contenido_frame = tk.Frame(canvas, bg="#FFFFFF")
 
     # Configurar canvas ANTES de crear la ventana
     canvas.configure(yscrollcommand=scrollbar.set)
 
-    # Crear Text widget para mostrar markdown con formato
-    # SIN height específico - solo con wrap=tk.WORD y width para controlar el flujo
     mensaje_text = tk.Text(
         contenido_frame,
         font=font.Font(family="Segoe UI", size=16),
         fg="#1a1a1a",
         bg="#FFFFFF",
         wrap=tk.WORD,
-        relief=tk.FLAT,
         padx=25,
         pady=30,
-        cursor="arrow",
         state="disabled",
-        width=70,  # Ancho fijo en caracteres para wrap correcto
+        width=70,
     )
     mensaje_text.pack(fill=tk.BOTH, expand=True)
 
@@ -150,25 +182,17 @@ def mostrar_alerta(mensaje):
     # Mostrar el mensaje con formato Markdown
     mostrar_markdown(mensaje)
 
-    # PASO 1: Actualizar el frame ANTES de crear la ventana en el canvas
     contenido_frame.update_idletasks()
-
-    # PASO 2: Obtener el tamaño real del contenido DESPUÉS de renderizar
     contenido_width = contenido_frame.winfo_reqwidth()
     contenido_height = contenido_frame.winfo_reqheight()
 
-    # PASO 3: Crear ventana en el canvas con el ancho del contenido real
     canvas_window = canvas.create_window(
         (0, 0), window=contenido_frame, anchor="nw", width=contenido_width
     )
 
-    # PASO 4: Actualizar scrollregion DESPUÉS de crear la ventana
-    # Esto es crítico para que el scroll funcione correctamente
     canvas.update_idletasks()
     canvas.configure(scrollregion=canvas.bbox("all"))
 
-    # PASO 5: Vincular reconfiguración solo cuando el canvas se redimensiona
-    # Esto mantiene el comportamiento correcto sin ciclos infinitos
     def actualizar_canvas_window(event=None):
         """Actualizar ancho cuando el canvas se redimensiona"""
         if event:
@@ -176,16 +200,11 @@ def mostrar_alerta(mensaje):
 
     canvas.bind("<Configure>", actualizar_canvas_window)
 
-    # Vincular la rueda del mouse CORRECTAMENTE
     def on_mousewheel(event):
-        # Scroll solo si hay contenido que scrollear
         if contenido_height > canvas.winfo_height():
             canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
-    # Asegurar que el canvas tenga el foco y pueda recibir eventos
     canvas.focus_set()
-
-    # Vincular al canvas para capturar eventos de scroll
     canvas.bind_all("<MouseWheel>", on_mousewheel)
 
     # Empaquetar canvas y scrollbar
@@ -252,17 +271,18 @@ def mostrar_alerta(mensaje):
 
     def verificar_confirmacion(event=None):
         texto = entry.get().strip().upper()
-        if texto == "CONFIRMAR":
+        if texto == CONFIG["CONFIRMATION_WORD"]:
+            logger.info("Confirmación exitosa por usuario")
             root.destroy()
         else:
             error_label.config(
-                text='⚠ La palabra debe coincidir con "CONFIRMAR" exactamente'
+                text=f'⚠ La palabra debe coincidir con "{CONFIG["CONFIRMATION_WORD"]}" exactamente'
             )
             entry.delete(0, tk.END)
+            logger.warning(f"Intento fallido de confirmación: {texto}")
             # Limpiar el mensaje de error después de 5 segundos
             root.after(5000, lambda: error_label.config(text=""))
 
-    # Botón confirmar al lado del textbox
     boton = tk.Button(
         input_frame,
         text="Confirmar y Cerrar",
@@ -270,15 +290,12 @@ def mostrar_alerta(mensaje):
         font=font.Font(family="Segoe UI", size=12, weight="bold"),
         bg="#7DC4F5",
         fg=COLOR_BLANCO,
-        relief=tk.FLAT,
         padx=20,
         pady=8,
         cursor="hand2",
         activebackground="#6AB3E4",
     )
     boton.pack(side=tk.RIGHT, fill=tk.Y)
-
-    # Permitir Enter cuando el botón tiene el foco (navegación con TAB)
     boton.bind("<Return>", lambda e: verificar_confirmacion())
 
     # Mensaje de error
@@ -316,18 +333,106 @@ def mostrar_alerta(mensaje):
 
 
 def iniciar_cliente():
-    # Escucha en todas las interfaces en el puerto 5000
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(("0.0.0.0", 5000))
-    server.listen(1)
+    """Inicia el servidor para escuchar mensajes entrantes"""
+    global server_running, server_socket
 
-    while True:
-        conn, addr = server.accept()
-        mensaje = conn.recv(2048).decode("utf-8")
-        if mensaje:
-            mostrar_alerta(mensaje)
-        conn.close()
+    try:
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.settimeout(CONFIG["TIMEOUT"])
+
+        server_socket.bind((CONFIG["HOST"], CONFIG["PORT"]))
+        server_socket.listen(5)
+
+        logger.info(f"✓ Servidor iniciado en {CONFIG['HOST']}:{CONFIG['PORT']}")
+
+        while server_running:
+            try:
+                conn, addr = server_socket.accept()
+                conn.settimeout(CONFIG["TIMEOUT"])
+
+                logger.info(f"Conexión aceptada desde {addr}")
+
+                try:
+                    datos = conn.recv(CONFIG["MAX_BUFFER"])
+
+                    if not datos:
+                        logger.warning(f"Conexión vacía desde {addr}")
+                        conn.close()
+                        continue
+
+                    mensaje = datos.decode("utf-8", errors="replace").strip()
+
+                    if not mensaje:
+                        logger.warning(f"Mensaje vacío desde {addr}")
+                        conn.close()
+                        continue
+
+                    logger.info(
+                        f"Mensaje recibido de {addr}: {len(mensaje)} caracteres"
+                    )
+
+                    # Ejecutar en thread separado para no bloquear el servidor
+                    thread = threading.Thread(target=mostrar_alerta, args=(mensaje,))
+                    thread.daemon = True
+                    thread.start()
+
+                except socket.timeout:
+                    logger.error(f"Timeout en recepción de datos desde {addr}")
+                except Exception as e:
+                    logger.error(f"Error procesando mensaje de {addr}: {e}")
+                finally:
+                    try:
+                        conn.close()
+                    except:
+                        pass
+
+            except socket.timeout:
+                continue
+            except Exception as e:
+                if server_running:
+                    logger.error(f"Error aceptando conexión: {e}")
+
+    except OSError as e:
+        logger.error(f"Error al iniciar servidor: {e}")
+        logger.error(f"Verifica que el puerto {CONFIG['PORT']} esté disponible")
+    except Exception as e:
+        logger.error(f"Error inesperado en servidor: {e}")
+    finally:
+        server_running = False
+        if server_socket:
+            try:
+                server_socket.close()
+                logger.info("Servidor cerrado correctamente")
+            except:
+                pass
+
+
+def manejar_signal(signum, frame):
+    """Maneja señales para shutdown graceful"""
+    global server_running
+    logger.info("Señal de terminación recibida. Cerrando servidor...")
+    server_running = False
+    if server_socket:
+        try:
+            server_socket.close()
+        except:
+            pass
+    sys.exit(0)
 
 
 if __name__ == "__main__":
-    iniciar_cliente()
+    logger.info("=" * 60)
+    logger.info("ESCLAVO - Servidor de Notificaciones")
+    logger.info("=" * 60)
+    logger.info(f"HOST: {CONFIG['HOST']}, PORT: {CONFIG['PORT']}")
+
+    # Registrar handlers para shutdown graceful
+    signal.signal(signal.SIGINT, manejar_signal)
+    signal.signal(signal.SIGTERM, manejar_signal)
+
+    try:
+        iniciar_cliente()
+    except Exception as e:
+        logger.critical(f"Error crítico: {e}", exc_info=True)
+        sys.exit(1)
