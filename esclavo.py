@@ -83,11 +83,11 @@ def mostrar_alerta(mensaje):
         padx=10,
         pady=10,
     )
-    banner.pack(fill=tk.X, pady=(0, 20))
+    banner.pack(fill=tk.X, pady=(0, 5))
 
     # Frame externo para el mensaje con sombra
     mensaje_outer_frame = tk.Frame(main_frame, bg="#D0D0D0")
-    mensaje_outer_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
+    mensaje_outer_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
 
     # Frame interno del mensaje con diseño mejorado
     mensaje_frame = tk.Frame(mensaje_outer_frame, bg="#FFFFFF")
@@ -216,7 +216,7 @@ def mostrar_alerta(mensaje):
 
     # Separador
     separator = tk.Frame(main_frame, height=1, bg="#E0E0E0")
-    separator.pack(fill=tk.X, pady=10)
+    separator.pack(fill=tk.X, pady=2)
 
     # Instrucciones
     instruccion_frame = tk.Frame(main_frame, bg=COLOR_BLANCO)
@@ -240,7 +240,7 @@ def mostrar_alerta(mensaje):
 
     tk.Label(
         instruccion_frame,
-        text=" para confirmar",
+        text=" para cerrar.",
         font=font.Font(family="Segoe UI", size=11),
         fg=COLOR_GRIS,
         bg=COLOR_BLANCO,
@@ -248,7 +248,7 @@ def mostrar_alerta(mensaje):
 
     # Frame para campo de texto y botón (en la misma línea)
     input_frame = tk.Frame(main_frame, bg=COLOR_BLANCO)
-    input_frame.pack(fill=tk.X, pady=(0, 0))
+    input_frame.pack(fill=tk.X, pady=(0, 2))
 
     # Campo de texto con borde
     entry_frame = tk.Frame(input_frame, bg="#CCCCCC", bd=1)
@@ -261,7 +261,7 @@ def mostrar_alerta(mensaje):
         bg=COLOR_BLANCO,
         fg="#333333",
     )
-    entry.pack(fill=tk.X, padx=1, pady=1, ipady=8)
+    entry.pack(fill=tk.X, padx=1, pady=0, ipady=8)
 
     # Función para convertir a mayúsculas mientras se escribe
     def a_mayusculas(*args):
@@ -288,17 +288,17 @@ def mostrar_alerta(mensaje):
 
     boton = tk.Button(
         input_frame,
-        text="Confirmar y Cerrar",
+        text="Cerrar",
         command=verificar_confirmacion,
         font=font.Font(family="Segoe UI", size=12, weight="bold"),
         bg="#7DC4F5",
         fg=COLOR_BLANCO,
         padx=20,
-        pady=8,
+        pady=0,
         cursor="hand2",
         activebackground="#6AB3E4",
     )
-    boton.pack(side=tk.RIGHT, fill=tk.Y)
+    boton.pack(side=tk.RIGHT, fill=tk.BOTH)
     boton.bind("<Return>", lambda e: verificar_confirmacion())
 
     # Mensaje de error
@@ -310,7 +310,7 @@ def mostrar_alerta(mensaje):
         bg=COLOR_BLANCO,
         anchor="w",
     )
-    error_label.pack(fill=tk.X, pady=(0, 5))
+    error_label.pack(fill=tk.X, pady=(0, 2))
 
     # Nota de contacto
     nota_contacto = tk.Label(
@@ -320,7 +320,7 @@ def mostrar_alerta(mensaje):
         fg="#888888",
         bg=COLOR_BLANCO,
     )
-    nota_contacto.pack(pady=(0, 0))
+    nota_contacto.pack(pady=0)
 
     # Permitir Enter para confirmar
     entry.bind("<Return>", verificar_confirmacion)
