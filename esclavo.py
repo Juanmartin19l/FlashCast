@@ -1,6 +1,7 @@
 import socket
 import tkinter as tk
 from tkinter import font
+import re
 
 
 def mostrar_alerta(mensaje):
@@ -60,42 +61,157 @@ def mostrar_alerta(mensaje):
     # Frame para el contenido del mensaje dentro del canvas
     contenido_frame = tk.Frame(canvas, bg="#FFFFFF", relief=tk.FLAT)
 
-    # Configurar canvas
+    # Configurar canvas ANTES de crear la ventana
     canvas.configure(yscrollcommand=scrollbar.set)
 
-    # Determinar si el mensaje es largo (más de 150 caracteres = negrita, menos = normal)
-    es_largo = len(mensaje) > 150
-    peso_fuente = "normal" if es_largo else "bold"
-
-    # Mostrar el mensaje dinámico del maestro con formato adaptativo
-    mensaje_texto = tk.Label(
+    # Crear Text widget para mostrar markdown con formato
+    # SIN height específico - solo con wrap=tk.WORD y width para controlar el flujo
+    mensaje_text = tk.Text(
         contenido_frame,
-        text=mensaje,
-        font=font.Font(family="Segoe UI", size=16, weight=peso_fuente),
+        font=font.Font(family="Segoe UI", size=16),
         fg="#1a1a1a",
         bg="#FFFFFF",
-        anchor="center",
-        justify=tk.CENTER,
-        wraplength=650,
+        wrap=tk.WORD,
+        relief=tk.FLAT,
         padx=25,
         pady=30,
+        cursor="arrow",
+        state="disabled",
+        width=70,  # Ancho fijo en caracteres para wrap correcto
     )
-    mensaje_texto.pack(fill=tk.BOTH, expand=True)
+    mensaje_text.pack(fill=tk.BOTH, expand=True)
 
-    # Crear ventana en el canvas
+    # Configurar tags para formato Markdown
+    mensaje_text.tag_config(
+        "h1", font=font.Font(family="Segoe UI", size=24, weight="bold"), spacing3=10
+    )
+    mensaje_text.tag_config(
+        "h2", font=font.Font(family="Segoe UI", size=20, weight="bold"), spacing3=8
+    )
+    mensaje_text.tag_config(
+        "h3", font=font.Font(family="Segoe UI", size=18, weight="bold"), spacing3=6
+    )
+    mensaje_text.tag_config(
+        "bold", font=font.Font(family="Segoe UI", size=16, weight="bold")
+    )
+    mensaje_text.tag_config(
+        "italic", font=font.Font(family="Segoe UI", size=16, slant="italic")
+    )
+    mensaje_text.tag_config(
+        "code",
+        font=font.Font(family="Courier", size=14),
+        background="#f5f5f5",
+        foreground="#c7254e",
+    )
+    mensaje_text.tag_config("bullet", lmargin1=25, lmargin2=40)
+    mensaje_text.tag_config("center", justify="center")
+
+    # Función para procesar y mostrar markdown
+    def mostrar_markdown(texto):
+        mensaje_text.config(state="normal")
+        mensaje_text.delete("1.0", tk.END)
+
+        lineas = texto.split("\n")
+        for linea in lineas:
+            # Encabezados
+            if linea.startswith("### "):
+                mensaje_text.insert(tk.END, linea[4:] + "\n", "h3")
+            elif linea.startswith("## "):
+                mensaje_text.insert(tk.END, linea[3:] + "\n", "h2")
+            elif linea.startswith("# "):
+                mensaje_text.insert(tk.END, linea[2:] + "\n", "h1")
+            # Listas con viñetas
+            elif linea.strip().startswith("- ") or linea.strip().startswith("* "):
+                mensaje_text.insert(tk.END, "• " + linea.strip()[2:] + "\n", "bullet")
+            # Línea normal con formato inline
+            else:
+                procesar_linea_inline(linea + "\n")
+
+        mensaje_text.config(state="disabled")
+        # Actualizar el tamaño del frame contenedor
+        contenido_frame.update_idletasks()
+
+    def procesar_linea_inline(linea):
+        # Procesar **negrita**, *cursiva*, y `código`
+        pos = 0
+        while pos < len(linea):
+            # Buscar **negrita**
+            match_bold = re.search(r"\*\*(.*?)\*\*", linea[pos:])
+            # Buscar *cursiva*
+            match_italic = re.search(r"\*(.*?)\*", linea[pos:])
+            # Buscar `código`
+            match_code = re.search(r"`(.*?)`", linea[pos:])
+
+            # Determinar cuál viene primero
+            matches = []
+            if match_bold:
+                matches.append((match_bold.start() + pos, "bold", match_bold))
+            if match_italic and (
+                not match_bold or match_italic.start() < match_bold.start()
+            ):
+                matches.append((match_italic.start() + pos, "italic", match_italic))
+            if match_code:
+                matches.append((match_code.start() + pos, "code", match_code))
+
+            if not matches:
+                # No hay más formato, insertar el resto
+                mensaje_text.insert(tk.END, linea[pos:])
+                break
+
+            # Obtener el match más cercano
+            matches.sort()
+            start_pos, tipo, match = matches[0]
+
+            # Insertar texto antes del match
+            if start_pos > pos:
+                mensaje_text.insert(tk.END, linea[pos:start_pos])
+
+            # Insertar texto formateado
+            if tipo == "bold":
+                mensaje_text.insert(tk.END, match.group(1), "bold")
+                pos = start_pos + match.end()
+            elif tipo == "italic":
+                mensaje_text.insert(tk.END, match.group(1), "italic")
+                pos = start_pos + match.end()
+            elif tipo == "code":
+                mensaje_text.insert(tk.END, match.group(1), "code")
+                pos = start_pos + match.end()
+
+    # Mostrar el mensaje con formato Markdown
+    mostrar_markdown(mensaje)
+
+    # PASO 1: Actualizar el frame ANTES de crear la ventana en el canvas
+    contenido_frame.update_idletasks()
+
+    # PASO 2: Obtener el tamaño real del contenido
+    contenido_width = contenido_frame.winfo_reqwidth()
+    contenido_height = contenido_frame.winfo_reqheight()
+
+    # PASO 3: Crear ventana en el canvas con el ancho del contenido real
     canvas_window = canvas.create_window(
-        (0, 0), window=contenido_frame, anchor="nw", width=690
+        (0, 0), window=contenido_frame, anchor="nw", width=contenido_width
     )
 
-    # Actualizar scroll region cuando cambie el tamaño
-    def configurar_scroll(event):
-        canvas.configure(scrollregion=canvas.bbox("all"))
-        canvas.itemconfig(canvas_window, width=event.width)
+    # PASO 4: Configurar scrollregion INMEDIATAMENTE con las coordenadas exactas
+    # Esto previene el scroll infinito porque define los límites reales del contenido
+    canvas.configure(scrollregion=(0, 0, contenido_width, contenido_height))
 
-    contenido_frame.bind("<Configure>", configurar_scroll)
-    canvas.bind(
-        "<Configure>", lambda e: canvas.itemconfig(canvas_window, width=e.width)
-    )
+    # PASO 5: Vincular reconfiguración solo cuando el canvas se redimensiona
+    # Esto mantiene el comportamiento correcto sin ciclos infinitos
+    def actualizar_canvas_window(event=None):
+        """Actualizar ancho cuando el canvas se redimensiona"""
+        if event:
+            canvas.itemconfig(canvas_window, width=event.width - 2)
+
+    canvas.bind("<Configure>", actualizar_canvas_window)
+
+    # Vincular la rueda del mouse al canvas para scroll
+    def on_mousewheel(event):
+        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    # Bind para Windows
+    canvas.bind_all("<MouseWheel>", on_mousewheel)
+    mensaje_text.bind_all("<MouseWheel>", on_mousewheel)
 
     # Empaquetar canvas y scrollbar
     canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -168,6 +284,8 @@ def mostrar_alerta(mensaje):
                 text='⚠ La palabra debe coincidir con "CONFIRMAR" exactamente'
             )
             entry.delete(0, tk.END)
+            # Limpiar el mensaje de error después de 5 segundos
+            root.after(5000, lambda: error_label.config(text=""))
 
     # Botón confirmar al lado del textbox
     boton = tk.Button(
