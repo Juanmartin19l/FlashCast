@@ -278,6 +278,9 @@ def mostrar_alerta(mensaje):
     )
     boton.pack(side=tk.RIGHT, fill=tk.Y)
 
+    # Permitir Enter cuando el botón tiene el foco (navegación con TAB)
+    boton.bind("<Return>", lambda e: verificar_confirmacion())
+
     # Mensaje de error
     error_label = tk.Label(
         main_frame,
