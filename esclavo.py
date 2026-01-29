@@ -81,7 +81,7 @@ def mostrar_alerta(mensaje):
     )
     mensaje_text.pack(fill=tk.BOTH, expand=True)
 
-    # Configurar tags para formato Markdown
+    # Configurar tags para formato
     mensaje_text.tag_config(
         "h1", font=font.Font(family="Segoe UI", size=24, weight="bold"), spacing3=10
     )
@@ -89,93 +89,63 @@ def mostrar_alerta(mensaje):
         "h2", font=font.Font(family="Segoe UI", size=20, weight="bold"), spacing3=8
     )
     mensaje_text.tag_config(
-        "h3", font=font.Font(family="Segoe UI", size=18, weight="bold"), spacing3=6
-    )
-    mensaje_text.tag_config(
         "bold", font=font.Font(family="Segoe UI", size=16, weight="bold")
     )
-    mensaje_text.tag_config(
-        "italic", font=font.Font(family="Segoe UI", size=16, slant="italic")
-    )
-    mensaje_text.tag_config(
-        "code",
-        font=font.Font(family="Courier", size=14),
-        background="#f5f5f5",
-        foreground="#c7254e",
-    )
-    mensaje_text.tag_config("bullet", lmargin1=25, lmargin2=40)
-    mensaje_text.tag_config("center", justify="center")
 
-    # Función para procesar y mostrar markdown
+    # Función para procesar y mostrar markdown simplificado
     def mostrar_markdown(texto):
         mensaje_text.config(state="normal")
         mensaje_text.delete("1.0", tk.END)
 
         lineas = texto.split("\n")
         for linea in lineas:
-            # Encabezados
-            if linea.startswith("### "):
-                mensaje_text.insert(tk.END, linea[4:] + "\n", "h3")
+            # Encabezados H1
+            if linea.startswith("# "):
+                mensaje_text.insert(tk.END, linea[2:] + "\n", "h1")
+            # Encabezados H2
             elif linea.startswith("## "):
                 mensaje_text.insert(tk.END, linea[3:] + "\n", "h2")
-            elif linea.startswith("# "):
-                mensaje_text.insert(tk.END, linea[2:] + "\n", "h1")
-            # Listas con viñetas
-            elif linea.strip().startswith("- ") or linea.strip().startswith("* "):
-                mensaje_text.insert(tk.END, "• " + linea.strip()[2:] + "\n", "bullet")
-            # Línea normal con formato inline
+            # Línea normal con negritas
             else:
-                procesar_linea_inline(linea + "\n")
+                procesar_linea_con_negritas(linea + "\n")
 
         mensaje_text.config(state="disabled")
         # Actualizar el tamaño del frame contenedor
         contenido_frame.update_idletasks()
 
-    def procesar_linea_inline(linea):
-        # Procesar **negrita**, *cursiva*, y `código`
+    def procesar_linea_con_negritas(linea):
+        """
+        Procesar **negritas** de forma simple y robusta.
+        Solo busca ** ** sin otros formatos.
+        """
         pos = 0
+
         while pos < len(linea):
-            # Buscar **negrita**
-            match_bold = re.search(r"\*\*(.*?)\*\*", linea[pos:])
-            # Buscar *cursiva*
-            match_italic = re.search(r"\*(.*?)\*", linea[pos:])
-            # Buscar `código`
-            match_code = re.search(r"`(.*?)`", linea[pos:])
+            # Buscar el próximo **
+            inicio_bold = linea.find("**", pos)
 
-            # Determinar cuál viene primero
-            matches = []
-            if match_bold:
-                matches.append((match_bold.start() + pos, "bold", match_bold))
-            if match_italic and (
-                not match_bold or match_italic.start() < match_bold.start()
-            ):
-                matches.append((match_italic.start() + pos, "italic", match_italic))
-            if match_code:
-                matches.append((match_code.start() + pos, "code", match_code))
-
-            if not matches:
-                # No hay más formato, insertar el resto
-                mensaje_text.insert(tk.END, linea[pos:])
+            if inicio_bold == -1:
+                # No hay más negritas, insertar el resto
+                if pos < len(linea):
+                    mensaje_text.insert(tk.END, linea[pos:])
                 break
 
-            # Obtener el match más cercano
-            matches.sort()
-            start_pos, tipo, match = matches[0]
+            # Insertar texto antes de **
+            if inicio_bold > pos:
+                mensaje_text.insert(tk.END, linea[pos:inicio_bold])
 
-            # Insertar texto antes del match
-            if start_pos > pos:
-                mensaje_text.insert(tk.END, linea[pos:start_pos])
+            # Buscar el cierre de **
+            fin_bold = linea.find("**", inicio_bold + 2)
 
-            # Insertar texto formateado
-            if tipo == "bold":
-                mensaje_text.insert(tk.END, match.group(1), "bold")
-                pos = start_pos + match.end()
-            elif tipo == "italic":
-                mensaje_text.insert(tk.END, match.group(1), "italic")
-                pos = start_pos + match.end()
-            elif tipo == "code":
-                mensaje_text.insert(tk.END, match.group(1), "code")
-                pos = start_pos + match.end()
+            if fin_bold == -1:
+                # No hay cierre, insertar ** como texto literal y el resto
+                mensaje_text.insert(tk.END, linea[inicio_bold:])
+                break
+            else:
+                # Extraer contenido entre **
+                contenido_bold = linea[inicio_bold + 2 : fin_bold]
+                mensaje_text.insert(tk.END, contenido_bold, "bold")
+                pos = fin_bold + 2
 
     # Mostrar el mensaje con formato Markdown
     mostrar_markdown(mensaje)
@@ -183,7 +153,7 @@ def mostrar_alerta(mensaje):
     # PASO 1: Actualizar el frame ANTES de crear la ventana en el canvas
     contenido_frame.update_idletasks()
 
-    # PASO 2: Obtener el tamaño real del contenido
+    # PASO 2: Obtener el tamaño real del contenido DESPUÉS de renderizar
     contenido_width = contenido_frame.winfo_reqwidth()
     contenido_height = contenido_frame.winfo_reqheight()
 
@@ -192,9 +162,10 @@ def mostrar_alerta(mensaje):
         (0, 0), window=contenido_frame, anchor="nw", width=contenido_width
     )
 
-    # PASO 4: Configurar scrollregion INMEDIATAMENTE con las coordenadas exactas
-    # Esto previene el scroll infinito porque define los límites reales del contenido
-    canvas.configure(scrollregion=(0, 0, contenido_width, contenido_height))
+    # PASO 4: Actualizar scrollregion DESPUÉS de crear la ventana
+    # Esto es crítico para que el scroll funcione correctamente
+    canvas.update_idletasks()
+    canvas.configure(scrollregion=canvas.bbox("all"))
 
     # PASO 5: Vincular reconfiguración solo cuando el canvas se redimensiona
     # Esto mantiene el comportamiento correcto sin ciclos infinitos
@@ -205,13 +176,14 @@ def mostrar_alerta(mensaje):
 
     canvas.bind("<Configure>", actualizar_canvas_window)
 
-    # Vincular la rueda del mouse al canvas para scroll
+    # Vincular la rueda del mouse CORRECTAMENTE
     def on_mousewheel(event):
         canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
-    # Bind para Windows
-    canvas.bind_all("<MouseWheel>", on_mousewheel)
-    mensaje_text.bind_all("<MouseWheel>", on_mousewheel)
+    # Usar bind() en lugar de bind_all() para evitar conflictos
+    # Vincular al canvas y al frame de contenido
+    canvas.bind("<MouseWheel>", on_mousewheel)
+    contenido_frame.bind("<MouseWheel>", on_mousewheel)
 
     # Empaquetar canvas y scrollbar
     canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -219,7 +191,7 @@ def mostrar_alerta(mensaje):
 
     # Separador
     separator = tk.Frame(main_frame, height=1, bg="#E0E0E0")
-    separator.pack(fill=tk.X, pady=20)
+    separator.pack(fill=tk.X, pady=10)
 
     # Instrucciones
     instruccion_frame = tk.Frame(main_frame, bg=COLOR_BLANCO)
@@ -251,7 +223,7 @@ def mostrar_alerta(mensaje):
 
     # Frame para campo de texto y botón (en la misma línea)
     input_frame = tk.Frame(main_frame, bg=COLOR_BLANCO)
-    input_frame.pack(fill=tk.X, pady=(0, 5))
+    input_frame.pack(fill=tk.X, pady=(0, 0))
 
     # Campo de texto con borde
     entry_frame = tk.Frame(input_frame, bg="#CCCCCC", bd=1)
