@@ -1,137 +1,210 @@
 import socket
 import tkinter as tk
 from tkinter import font
-import winsound
-import threading
-
-
-def sonar_alarma():
-    # Sonido de alarma continuo
-    for _ in range(5):  # 5 beeps
-        winsound.Beep(1000, 300)  # 1000Hz por 300ms
 
 
 def mostrar_alerta(mensaje):
     root = tk.Tk()
-
-    # Eliminar barra de título y botones PRIMERO
     root.overrideredirect(True)
 
-    root.attributes("-topmost", True)  # Lo pone por encima de TODO
-    root.configure(bg="red")  # Fondo rojo para urgencia
+    # Colores corporativos
+    COLOR_AZUL = "#4A90E2"
+    COLOR_AZUL_CLARO = "#E8F4FD"
+    COLOR_GRIS = "#666666"
+    COLOR_BLANCO = "#FFFFFF"
+    COLOR_ERROR = "#E74C3C"
 
-    # Forzar actualización para obtener dimensiones correctas
-    root.update_idletasks()
+    root.attributes("-topmost", True)
+    root.configure(bg=COLOR_BLANCO)
 
-    # Obtener dimensiones de la pantalla
+    # Centrar ventana
+    ancho_ventana = 750
+    alto_ventana = 650
     ancho_pantalla = root.winfo_screenwidth()
     alto_pantalla = root.winfo_screenheight()
+    x = (ancho_pantalla - ancho_ventana) // 2
+    y = (alto_pantalla - alto_ventana) // 2
 
-    # Ajustar tamaño para dejar visible la barra de tareas (restar ~60px)
-    altura_ventana = alto_pantalla - 60
-
-    # Configurar geometría y forzar posición
-    root.geometry(f"{ancho_pantalla}x{altura_ventana}+0+0")
-    root.state("normal")
+    root.geometry(f"{ancho_ventana}x{alto_ventana}+{x}+{y}")
     root.resizable(False, False)
 
-    # Reproducir sonido de alarma en otro hilo
-    threading.Thread(target=sonar_alarma, daemon=True).start()
+    # Frame principal con padding
+    main_frame = tk.Frame(root, bg=COLOR_BLANCO)
+    main_frame.pack(fill=tk.BOTH, expand=True, padx=30, pady=20)
 
-    # Fuente grande y en negrita
-    fuente = font.Font(family="Arial", size=48, weight="bold")
-
-    # Título parpadeante
-    titulo = tk.Label(
-        root, text="⚠️ MENSAJE URGENTE ⚠️", font=fuente, fg="yellow", bg="red"
+    # Banner "Notificación Importante"
+    banner = tk.Label(
+        main_frame,
+        text="⚠️ NOTIFICACIÓN IMPORTANTE",
+        font=font.Font(family="Segoe UI", size=11, weight="bold"),
+        fg=COLOR_AZUL,
+        bg=COLOR_AZUL_CLARO,
+        anchor="w",
+        padx=10,
+        pady=10,
     )
-    titulo.pack(pady=50)
+    banner.pack(fill=tk.X, pady=(0, 20))
 
-    # Hacer que el título parpadee
-    def parpadear():
-        color_actual = titulo.cget("fg")
-        nuevo_color = "yellow" if color_actual == "white" else "white"
-        titulo.config(fg=nuevo_color)
-        root.after(500, parpadear)
+    # Frame externo para el mensaje con sombra
+    mensaje_outer_frame = tk.Frame(main_frame, bg="#D0D0D0", relief=tk.FLAT)
+    mensaje_outer_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
 
-    parpadear()
+    # Frame interno del mensaje con diseño mejorado
+    mensaje_frame = tk.Frame(mensaje_outer_frame, bg="#FFFFFF", relief=tk.FLAT)
+    mensaje_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
 
-    # Mensaje principal
-    fuente_mensaje = font.Font(family="Arial", size=32)
-    label = tk.Label(
-        root,
+    # Canvas con scrollbar para mensajes largos
+    canvas = tk.Canvas(mensaje_frame, bg="#FFFFFF", highlightthickness=0)
+    scrollbar = tk.Scrollbar(mensaje_frame, orient="vertical", command=canvas.yview)
+
+    # Frame para el contenido del mensaje dentro del canvas
+    contenido_frame = tk.Frame(canvas, bg="#FFFFFF", relief=tk.FLAT)
+
+    # Configurar canvas
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    # Determinar si el mensaje es largo (más de 150 caracteres = negrita, menos = normal)
+    es_largo = len(mensaje) > 150
+    peso_fuente = "normal" if es_largo else "bold"
+
+    # Mostrar el mensaje dinámico del maestro con formato adaptativo
+    mensaje_texto = tk.Label(
+        contenido_frame,
         text=mensaje,
-        font=fuente_mensaje,
-        fg="white",
-        bg="red",
-        wraplength=root.winfo_screenwidth() - 100,
+        font=font.Font(family="Segoe UI", size=16, weight=peso_fuente),
+        fg="#1a1a1a",
+        bg="#FFFFFF",
+        anchor="center",
+        justify=tk.CENTER,
+        wraplength=650,
+        padx=25,
+        pady=30,
     )
-    label.pack(expand=True, pady=20)
+    mensaje_texto.pack(fill=tk.BOTH, expand=True)
+
+    # Crear ventana en el canvas
+    canvas_window = canvas.create_window(
+        (0, 0), window=contenido_frame, anchor="nw", width=690
+    )
+
+    # Actualizar scroll region cuando cambie el tamaño
+    def configurar_scroll(event):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+        canvas.itemconfig(canvas_window, width=event.width)
+
+    contenido_frame.bind("<Configure>", configurar_scroll)
+    canvas.bind(
+        "<Configure>", lambda e: canvas.itemconfig(canvas_window, width=e.width)
+    )
+
+    # Empaquetar canvas y scrollbar
+    canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    # Separador
+    separator = tk.Frame(main_frame, height=1, bg="#E0E0E0")
+    separator.pack(fill=tk.X, pady=20)
 
     # Instrucciones
-    instruccion = tk.Label(
-        root,
-        text='Escribe "confirmar" para cerrar:',
-        font=font.Font(size=24),
-        fg="white",
-        bg="red",
-    )
-    instruccion.pack(pady=10)
+    instruccion_frame = tk.Frame(main_frame, bg=COLOR_BLANCO)
+    instruccion_frame.pack(fill=tk.X, pady=(0, 10))
 
-    # Campo de texto
-    entry = tk.Entry(root, font=font.Font(size=24), width=20, justify="center")
-    entry.pack(pady=10)
+    tk.Label(
+        instruccion_frame,
+        text="Escriba ",
+        font=font.Font(family="Segoe UI", size=11),
+        fg=COLOR_GRIS,
+        bg=COLOR_BLANCO,
+    ).pack(side=tk.LEFT)
+
+    tk.Label(
+        instruccion_frame,
+        text='"CONFIRMAR"',
+        font=font.Font(family="Segoe UI", size=11, weight="bold"),
+        fg=COLOR_AZUL,
+        bg=COLOR_BLANCO,
+    ).pack(side=tk.LEFT)
+
+    tk.Label(
+        instruccion_frame,
+        text=" para confirmar",
+        font=font.Font(family="Segoe UI", size=11),
+        fg=COLOR_GRIS,
+        bg=COLOR_BLANCO,
+    ).pack(side=tk.LEFT)
+
+    # Campo de texto con borde
+    entry_frame = tk.Frame(main_frame, bg="#CCCCCC", bd=1)
+    entry_frame.pack(fill=tk.X, pady=(0, 5))
+
+    entry = tk.Entry(
+        entry_frame,
+        font=font.Font(family="Segoe UI", size=12),
+        relief=tk.FLAT,
+        bg=COLOR_BLANCO,
+        fg="#333333",
+    )
+    entry.pack(fill=tk.X, padx=1, pady=1, ipady=8)
+
+    # Función para convertir a mayúsculas mientras se escribe
+    def a_mayusculas(*args):
+        texto = entry_var.get().upper()
+        entry_var.set(texto)
+
+    entry_var = tk.StringVar()
+    entry_var.trace("w", a_mayusculas)
+    entry.config(textvariable=entry_var)
 
     # Mensaje de error
     error_label = tk.Label(
-        root, text="", font=font.Font(size=18), fg="yellow", bg="red"
+        main_frame,
+        text="",
+        font=font.Font(family="Segoe UI", size=10),
+        fg=COLOR_ERROR,
+        bg=COLOR_BLANCO,
+        anchor="w",
     )
-    error_label.pack(pady=5)
+    error_label.pack(fill=tk.X, pady=(0, 10))
 
     def verificar_confirmacion(event=None):
-        texto = entry.get().strip().lower()
-        if texto == "confirmar":
+        texto = entry.get().strip().upper()
+        if texto == "CONFIRMAR":
             root.destroy()
         else:
-            error_label.config(text="❌ Debes escribir exactamente: confirmar")
+            error_label.config(
+                text='⚠ La palabra debe coincidir con "CONFIRMAR" exactamente'
+            )
             entry.delete(0, tk.END)
-            winsound.Beep(500, 200)  # Sonido de error
 
-    # Botón para confirmar
+    # Frame para botón y nota
+    bottom_frame = tk.Frame(main_frame, bg=COLOR_BLANCO)
+    bottom_frame.pack(fill=tk.X, pady=(5, 0))
+
+    # Botón confirmar
     boton = tk.Button(
-        root,
-        text="ACEPTAR",
+        bottom_frame,
+        text="Confirmar y Cerrar",
         command=verificar_confirmacion,
-        font=font.Font(size=24, weight="bold"),
-        bg="yellow",
-        fg="red",
-        padx=40,
-        pady=20,
+        font=font.Font(family="Segoe UI", size=12, weight="bold"),
+        bg="#7DC4F5",
+        fg=COLOR_BLANCO,
+        relief=tk.FLAT,
+        padx=35,
+        pady=12,
+        cursor="hand2",
+        activebackground="#6AB3E4",
     )
-    boton.pack(pady=20)
+    boton.pack(side=tk.RIGHT)
 
-    # Nota de contacto
-    nota_contacto = tk.Label(
-        root,
-        text="Cualquier consulta comunicarse con el departamento de coordinación",
-        font=font.Font(size=16, slant="italic"),
-        fg="white",
-        bg="red",
-    )
-    nota_contacto.pack(pady=15)
-
-    # También permitir Enter para confirmar
+    # Permitir Enter para confirmar
     entry.bind("<Return>", verificar_confirmacion)
 
-    # Deshabilitar todas las formas de cerrar
+    # Deshabilitar cierre no autorizado
     root.protocol("WM_DELETE_WINDOW", lambda: None)
-    for key in ["<Escape>", "<Alt-F4>", "<Control-w>", "<Control-q>"]:
-        root.bind(key, lambda e: None)
 
-    # Forzar focus en el campo de texto después de que se renderice la ventana
+    # Focus en el campo de texto
     root.update()
     entry.focus_force()
-    entry.icursor(tk.END)
 
     root.mainloop()
 
