@@ -3,3 +3,4 @@ historial_ips.json
 __pycache__/
 dist/
 build/
+esclavo.spec

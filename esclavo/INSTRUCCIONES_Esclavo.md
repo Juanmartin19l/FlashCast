@@ -1,5 +1,40 @@
 # 📋 Instrucciones - MENSAJE Esclavo (Ejecutable)
 
+## Cómo generar el ejecutable (.exe)
+
+Si modificas el código fuente y necesitas volver a generar el ejecutable, sigue estos pasos desde la raíz del proyecto:
+
+1. Crea un entorno virtual (solo la primera vez):
+
+   ```powershell
+   python -m venv .venv
+   ```
+
+2. Activa el entorno virtual:
+
+   ```powershell
+   # En PowerShell
+   .venv\Scripts\Activate.ps1
+   # En CMD
+   .venv\Scripts\activate.bat
+   ```
+
+3. Instala PyInstaller (solo la primera vez):
+
+   ```powershell
+   pip install pyinstaller
+   ```
+
+4. Genera el ejecutable:
+
+   ```powershell
+   pyinstaller --onefile --noconsole esclavo/esclavo.py
+   ```
+
+El archivo generado estará en la carpeta `dist/`.
+
+---
+
 ## Paso 1: Copiar a otras PC e Instalar Autoinicio
 
 **En la PC del empleado:**

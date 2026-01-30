@@ -7,9 +7,7 @@ import signal
 import sys
 import os
 import subprocess
-import time
 from datetime import datetime
-from collections import deque
 
 
 # Configuración de logging
@@ -41,13 +39,10 @@ CONFIG = {
     "MAX_BUFFER": 8192,
     "CONFIRMATION_WORD": "CONFIRMAR",
     "PROCESO_BLOQUEANTE": "MacroRecorder.exe",
-    "INTERVALO_VERIFICACION": 2,  # segundos
 }
 
 server_running = True
 server_socket = None
-cola_mensajes = deque()  # Cola para mensajes pendientes
-verificando_proceso = False
 
 
 def proceso_esta_abierto(nombre_proceso):
@@ -64,31 +59,6 @@ def proceso_esta_abierto(nombre_proceso):
     except Exception as e:
         logger.error(f"Error verificando proceso {nombre_proceso}: {e}")
         return False
-
-
-def verificar_y_mostrar_mensajes():
-    """Hilo que verifica si el proceso bloqueante está cerrado y muestra mensajes pendientes"""
-    global verificando_proceso, cola_mensajes
-
-    verificando_proceso = True
-
-    while server_running and len(cola_mensajes) > 0:
-        tiempo_espera = CONFIG["INTERVALO_VERIFICACION"]
-
-        if not proceso_esta_abierto(CONFIG["PROCESO_BLOQUEANTE"]):
-            # Proceso cerrado, mostrar el primer mensaje de la cola
-            if len(cola_mensajes) > 0:
-                mensaje = cola_mensajes.popleft()
-                logger.info(
-                    f"Proceso {CONFIG['PROCESO_BLOQUEANTE']} cerrado. Mostrando mensaje pendiente."
-                )
-                mostrar_alerta(mensaje)
-                time.sleep(1)  # Esperar un segundo antes de verificar el siguiente
-        else:
-            # Proceso sigue abierto, esperar
-            time.sleep(tiempo_espera)
-
-    verificando_proceso = False
 
 
 def mostrar_alerta(mensaje):
@@ -376,10 +346,6 @@ def mostrar_alerta(mensaje):
     # Deshabilitar cierre no autorizado
     root.protocol("WM_DELETE_WINDOW", lambda: None)
 
-    # Focus en el campo de texto
-    root.update()
-    entry.focus_force()
-
     root.mainloop()
 
 
@@ -426,16 +392,9 @@ def iniciar_cliente():
                     # Verificar si el proceso bloqueante está abierto
                     if proceso_esta_abierto(CONFIG["PROCESO_BLOQUEANTE"]):
                         logger.warning(
-                            f"Proceso {CONFIG['PROCESO_BLOQUEANTE']} está activo. Mensaje encolado."
+                            f"Proceso {CONFIG['PROCESO_BLOQUEANTE']} está activo. Mensaje DESCARTADO."
                         )
-                        cola_mensajes.append(mensaje)
-
-                        # Iniciar el hilo de verificación si no está corriendo
-                        if not verificando_proceso:
-                            thread_verificador = threading.Thread(
-                                target=verificar_y_mostrar_mensajes, daemon=True
-                            )
-                            thread_verificador.start()
+                        # No se encola ni se muestra el mensaje
                     else:
                         # Ejecutar en thread separado para no bloquear el servidor
                         thread = threading.Thread(
