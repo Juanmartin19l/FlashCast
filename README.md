@@ -66,8 +66,8 @@ python servidor/servidor.py
 .venv\Scripts\activate  # Windows
 source .venv/bin/activate  # Linux/Mac
 
-# Build executable
-pyinstaller --onefile --noconsole cliente/cliente.py
+# Build executable with FlashCast icon
+pyinstaller --onefile --noconsole --icon=frontend/static/flashcast.png cliente/cliente.py
 
 # The executable will be in: dist/cliente.exe
 # Distribute to network machines
