@@ -1,0 +1,53 @@
+services:
+  # Servidor web Flask con Gunicorn
+  flashcast-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: flashcast-server:latest
+    container_name: flashcast-server
+    restart: always
+    # network_mode host requerido para enviar mensajes TCP a la red local
+    network_mode: host
+    volumes:
+      - ./data:/app/data
+    environment:
+      - FLASK_ENV=production
+      - GUNICORN_WORKERS=4
+      - GUNICORN_THREADS=2
+      - TZ=America/Argentina/Buenos_Aires
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Servicio de descubrimiento de máquinas
+  flashcast-discovery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: flashcast-server:latest
+    container_name: flashcast-discovery
+    restart: always
+    # network_mode host requerido para ping y resolución DNS en red local
+    network_mode: host
+    command: ['python', 'backend/discovery_service.py']
+    volumes:
+      - ./data:/app/data
+    environment:
+      - TZ=America/Argentina/Buenos_Aires
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    depends_on:
+      flashcast-server:
+        condition: service_healthy
