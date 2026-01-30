@@ -67,7 +67,7 @@ Abre tu navegador y ve a: **http://localhost:8080**
 
 ## Configuration
 
-Constants can be adjusted at the top of `servidor/servidor.py`:
+Constants can be adjusted at the top of `servidor/backend/servidor.py`:
 
 ```python
 PUERTO = 5000              # TCP port for client communication
@@ -154,7 +154,7 @@ data/
 Para reiniciar el historial de IPs, simplemente elimina o vacía el archivo:
 
 ```bash
-rm data/historial_ips.json
+rm servidor/data/historial_ips.json
 ```
 
 El archivo se recreará automáticamente en el próximo envío.

@@ -1,27 +1,36 @@
 # ⚡ FlashCast
 
-A distributed network messaging system for broadcasting instant notifications to multiple machines on a local network. Built with a server-client architecture for corporate environments.
+Sistema de mensajería distribuida para enviar notificaciones instantáneas a múltiples equipos en una red local. Perfecto para entornos corporativos y departamentos de TI.
+
+## ✨ Features
+
+- 🚀 Transmisión masiva (500+ equipos simultáneamente)
+- 🌐 Interfaz web moderna
+- 📡 Monitoreo en tiempo real
+- 🔍 Descubrimiento automático de red
+- 💾 Historial de IPs para envíos optimizados
+- 🛑 Control de cancelación de envíos
 
 ## 🏗️ Project Structure
 
 ```
 FlashCast/
 ├── servidor/                   # Broadcast server
-│   └── servidor.py            # Flask server + network scanner
+│   ├── backend/
+│   │   └── servidor.py        # Flask server + network scanner
+│   ├── frontend/              # Web interface
+│   │   ├── templates/
+│   │   │   └── index.html     # Control panel
+│   │   └── static/
+│   │       ├── script.js      # Frontend logic
+│   │       └── style.css      # Styles
+│   └── data/                  # Persistence
+│       └── historial_ips.json # IP database
 │
 ├── cliente/                    # Client agent
 │   ├── cliente.py             # Message receiver service
+│   ├── flashcast.ico          # Icon for executable
 │   └── INSTRUCCIONES_Cliente.md
-│
-├── frontend/                   # Web interface
-│   ├── templates/
-│   │   └── index.html         # Control panel
-│   └── static/
-│       ├── script.js          # Frontend logic
-│       └── style.css          # Styles
-│
-├── data/                       # Persistence
-│   └── historial_ips.json     # IP database
 │
 └── docs/                       # Documentation
     ├── README_Servidor.md     # Server guide
@@ -30,80 +39,46 @@ FlashCast/
 
 ## 🚀 Quick Start
 
-### Initial Setup
+### 1. Instalación
 
 ```bash
-# 1. Clone or download the repository
+# Clonar repositorio
 cd FlashCast
 
-# 2. Create virtual environment (recommended)
+# Crear entorno virtual
 python -m venv .venv
 
-# 3. Activate virtual environment
-# Windows:
-.venv\Scripts\activate
-# Linux/Mac:
-source .venv/bin/activate
-
-# 4. Install dependencies
-pip install -r requirements.txt
-```
-
-### Run the Server
-
-```bash
-# From the project root
-python servidor/servidor.py
-
-# Open browser at:
-# http://localhost:8080
-```
-
-### Build Client Executable
-
-```bash
-# Activate virtual environment first (if not already active)
+# Activar entorno virtual
 .venv\Scripts\activate  # Windows
 source .venv/bin/activate  # Linux/Mac
 
-# Build executable with FlashCast icon
-pyinstaller --onefile --noconsole --icon=cliente/flashcast.ico cliente/cliente.py
-
-# The executable will be in: dist/cliente.exe
-# Distribute to network machines
+# Instalar dependencias
+pip install -r requirements.txt
 ```
 
-## 📋 Components
+### 2. Ejecutar Servidor
 
-### 🖥️ Server
+```bash
+python servidor/backend/servidor.py
+```
 
-- **Web Port**: 8080
-- **TCP Port**: 5000
-- **Features**: Network scanning, message broadcasting, web interface
+Acceder a: **http://localhost:8080**
 
-### 💻 Client
+### 3. Generar Cliente (.exe)
 
-- **Port**: 5000
-- **Features**: Listens for messages, displays GUI alerts
+```bash
+pyinstaller --onefile --noconsole --icon=cliente/flashcast.ico cliente/cliente.py
+```
 
-## 📖 Documentation
+El ejecutable estará en `dist/cliente.exe` - distribuir a los equipos de la red.
 
-- **[README_Servidor.md](docs/README_Servidor.md)**: Server configuration and usage
-- **[INSTRUCCIONES_Cliente.md](docs/INSTRUCCIONES_Cliente.md)**: Client installation guide
+## � Documentation
 
-## ⚙️ Technologies
+- [Server Guide](docs/INSTRUCCIONES_Servidor.md) - Detailed server configuration
+- [Client Installation](docs/INSTRUCCIONES_Cliente.md) - Client deployment guide
 
-- **Server**: Python, Flask, Socket, ThreadPoolExecutor
-- **Frontend**: HTML5, CSS3, JavaScript ES6, EventSource
-- **Client**: Python, Tkinter, Socket
+## 🛠️ Stack Tecnológico
 
-## 🔒 Security
-
-- Local network only
-- Message limit: 2048 bytes
-- Connection timeout: 0.3s
-- Input validation
-
-## 📝 License
-
-Internal corporate project.
+**Servidor:** Python, Flask, Socket, ThreadPoolExecutor  
+**Frontend:** HTML5, CSS3, JavaScript ES6, SSE  
+**Cliente:** Python, Tkinter, PyInstaller
