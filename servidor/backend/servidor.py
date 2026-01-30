@@ -1,9 +1,7 @@
 import socket
-import ipaddress
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
-from datetime import datetime
 from flask import Flask, render_template, request, jsonify, Response
 import threading
 import queue
@@ -11,10 +9,10 @@ import time
 
 # --- CONFIGURACIÓN ---
 PUERTO = 5000
-TIMEOUT = 0.3
+TIMEOUT = 2.0  # Segundos de espera para conexión
 MAX_HILOS = 500
-ARCHIVO_HISTORIAL = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "data", "historial_ips.json"
+ARCHIVO_MAQUINAS = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data", "machines.json"
 )
 MAX_CARACTERES = 2048  # Límite de caracteres del mensaje
 
@@ -32,31 +30,22 @@ app = Flask(
 # Variables globales
 log_queue = queue.Queue()
 contador_enviados = 0
-historial_ips = {}
+maquinas_cache = {}  # Cache del archivo machines.json
 lock = threading.Lock()
 enviando = False
 cancelar_envio = False
 
 
-def cargar_historial():
-    """Carga el historial de IPs contactadas desde el archivo"""
-    if os.path.exists(ARCHIVO_HISTORIAL):
+def cargar_maquinas():
+    """Carga la lista de máquinas desde machines.json"""
+    if os.path.exists(ARCHIVO_MAQUINAS):
         try:
-            with open(ARCHIVO_HISTORIAL, "r") as f:
+            with open(ARCHIVO_MAQUINAS, "r") as f:
                 return json.load(f)
         except (json.JSONDecodeError, IOError) as e:
-            print(f"Error cargando historial: {e}")
+            print(f"Error cargando machines.json: {e}")
             return {}
     return {}
-
-
-def guardar_historial():
-    """Guarda el historial de IPs contactadas en el archivo"""
-    try:
-        with open(ARCHIVO_HISTORIAL, "w") as f:
-            json.dump(historial_ips, f, indent=2)
-    except (IOError, OSError) as e:
-        print(f"Error guardando historial: {e}")
 
 
 def agregar_log(texto, tipo="info"):
@@ -67,7 +56,6 @@ def agregar_log(texto, tipo="info"):
 def enviar_a_ip(ip, mensaje):
     global contador_enviados, cancelar_envio
 
-    # Verificar si se canceló el envío
     if cancelar_envio:
         return False
 
@@ -77,40 +65,22 @@ def enviar_a_ip(ip, mensaje):
             s.connect((str(ip), PUERTO))
             s.sendall(mensaje.encode("utf-8"))
 
-            # Registrar envío exitoso
-            ip_str = str(ip)
-            es_repetida = ip_str in historial_ips
-
             with lock:
                 contador_enviados += 1
-                historial_ips[ip_str] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-                if es_repetida:
-                    agregar_log(f"🔄 {ip_str} (ya contactada antes)", "repetida")
-                else:
-                    agregar_log(f"✅ {ip_str} (nueva)", "nueva")
+                agregar_log(f"✅ {ip}", "nueva")
 
             return True
-    except (socket.timeout, ConnectionRefusedError, OSError):
-        pass
-    except Exception as e:
-        print(f"Error inesperado enviando a {ip}: {e}")
+    except socket.timeout:
+        agregar_log(f"⏱️ {ip} - timeout", "error")
+    except ConnectionRefusedError:
+        agregar_log(f"🚫 {ip} - cliente no ejecutándose", "error")
+    except OSError as e:
+        agregar_log(f"❌ {ip} - {e}", "error")
     return False
 
 
-def obtener_mi_red():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(("8.8.8.8", 80))
-        mi_ip = s.getsockname()[0]
-        red_obj = ipaddress.ip_network(f"{mi_ip}/16", strict=False)
-        return red_obj.hosts()
-    finally:
-        s.close()
-
-
 def iniciar_bombardeo(mensaje):
-    global contador_enviados, enviando, cancelar_envio
+    global contador_enviados, enviando, cancelar_envio, maquinas_cache
 
     enviando = True
     cancelar_envio = False
@@ -119,56 +89,33 @@ def iniciar_bombardeo(mensaje):
         contador_enviados = 0
 
     agregar_log("🚀 Iniciando envío masivo...", "info")
-    agregar_log("-" * 50, "separator")
 
-    # Primero enviar a IPs conocidas
-    ips_conocidas = []
-    for ip_str in historial_ips.keys():
-        try:
-            ips_conocidas.append(ipaddress.ip_address(ip_str))
-        except ValueError:
-            print(f"IP inválida en historial: {ip_str}")
+    # Recargar machines.json (puede haber sido actualizado por discovery_service)
+    maquinas_cache = cargar_maquinas()
 
-    if ips_conocidas and not cancelar_envio:
-        agregar_log(
-            f"⚡ Enviando primero a {len(ips_conocidas)} IPs conocidas...", "info"
-        )
-        with ThreadPoolExecutor(max_workers=MAX_HILOS) as executor:
-            executor.map(lambda ip: enviar_a_ip(ip, mensaje), ips_conocidas)
+    # Extraer IPs del JSON
+    ips = []
+    for hostname, data in maquinas_cache.items():
+        if isinstance(data, dict) and "ip" in data:
+            ips.append(data["ip"])
+        elif isinstance(data, str):
+            ips.append(data)
 
-        if cancelar_envio:
-            agregar_log("🛑 Envío cancelado por el usuario", "error")
-            enviando = False
-            return
-
-        agregar_log("✅ IPs conocidas procesadas", "success")
-        agregar_log("-" * 50, "separator")
-
-    # Luego escanear toda la red
-    if not cancelar_envio:
-        agregar_log("🔍 Escaneando resto de la red...", "info")
-        hosts = obtener_mi_red()
-
-        ips_conocidas_str = set(historial_ips.keys())
-        hosts_nuevos = [h for h in hosts if str(h) not in ips_conocidas_str]
-
-        with ThreadPoolExecutor(max_workers=MAX_HILOS) as executor:
-            executor.map(lambda ip: enviar_a_ip(ip, mensaje), hosts_nuevos)
-
-    if cancelar_envio:
-        agregar_log("🛑 Envío cancelado por el usuario", "error")
+    if not ips:
+        agregar_log("⚠️ No hay máquinas en machines.json", "error")
+        agregar_log("💡 Ejecuta discovery_service.py para encontrar máquinas", "info")
         enviando = False
         return
 
-    guardar_historial()
+    agregar_log(f"📤 Enviando a {len(ips)} máquinas...", "info")
 
-    agregar_log("-" * 50, "separator")
-    agregar_log(
-        f"🏁 Finalizado. Total: {contador_enviados} mensajes enviados", "success"
-    )
-    agregar_log(
-        f"📚 Historial total: {len(historial_ips)} IPs únicas contactadas", "info"
-    )
+    with ThreadPoolExecutor(max_workers=MAX_HILOS) as executor:
+        list(executor.map(lambda ip: enviar_a_ip(ip, mensaje), ips))
+
+    if cancelar_envio:
+        agregar_log("🛑 Envío cancelado", "error")
+    else:
+        agregar_log(f"🏁 Finalizado. {contador_enviados} mensajes enviados", "success")
 
     enviando = False
 
@@ -227,7 +174,7 @@ def estadisticas():
     return jsonify(
         {
             "contador": contador_enviados,
-            "historial_total": len(historial_ips),
+            "historial_total": len(maquinas_cache),
             "enviando": enviando,
         }
     )
@@ -252,7 +199,7 @@ def stream():
                     stats = {
                         "type": "estadisticas",
                         "contador": contador_enviados,
-                        "historial_total": len(historial_ips),
+                        "historial_total": len(maquinas_cache),
                         "enviando": enviando,
                     }
                     yield f"data: {json.dumps(stats)}\n\n"
@@ -265,8 +212,10 @@ def stream():
 
 
 if __name__ == "__main__":
-    # Cargar historial al iniciar
-    historial_ips = cargar_historial()
+    # Cargar máquinas al iniciar
+    maquinas_cache = cargar_maquinas()
     print("🚀 Servidor web iniciado en http://localhost:8080")
     print("📢 Abre tu navegador y ve a esa dirección")
+    print("💡 Asegúrate de ejecutar discovery_service.py para actualizar machines.json")
+    print(f"📚 Máquinas cargadas: {len(maquinas_cache)}")
     app.run(host="0.0.0.0", port=8080, debug=False, threaded=True)
