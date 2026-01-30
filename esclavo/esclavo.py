@@ -6,7 +6,10 @@ import threading
 import signal
 import sys
 import os
+import subprocess
+import time
 from datetime import datetime
+from collections import deque
 
 
 # Configuración de logging
@@ -30,17 +33,62 @@ def configurar_logging():
 
 logger = configurar_logging()
 
-# Configuración global
+# Configuración global (hardcodeada)
 CONFIG = {
-    "HOST": os.getenv("ESCLAVO_HOST", "0.0.0.0"),
-    "PORT": int(os.getenv("ESCLAVO_PORT", "5000")),
-    "TIMEOUT": int(os.getenv("ESCLAVO_TIMEOUT", "30")),
-    "MAX_BUFFER": int(os.getenv("ESCLAVO_MAX_BUFFER", "8192")),
-    "CONFIRMATION_WORD": os.getenv("CONFIRMATION_WORD", "CONFIRMAR"),
+    "HOST": "0.0.0.0",
+    "PORT": 5000,
+    "TIMEOUT": 30,
+    "MAX_BUFFER": 8192,
+    "CONFIRMATION_WORD": "CONFIRMAR",
+    "PROCESO_BLOQUEANTE": "MacroRecorder.exe",
+    "INTERVALO_VERIFICACION": 2,  # segundos
 }
 
 server_running = True
 server_socket = None
+cola_mensajes = deque()  # Cola para mensajes pendientes
+verificando_proceso = False
+
+
+def proceso_esta_abierto(nombre_proceso):
+    """Verifica si un proceso está abierto usando tasklist"""
+    try:
+        resultado = subprocess.run(
+            ["tasklist", "/FI", f"IMAGENAME eq {nombre_proceso}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        # Si el proceso está en la lista, tasklist lo retorna
+        return nombre_proceso.lower() in resultado.stdout.lower()
+    except Exception as e:
+        logger.error(f"Error verificando proceso {nombre_proceso}: {e}")
+        return False
+
+
+def verificar_y_mostrar_mensajes():
+    """Hilo que verifica si el proceso bloqueante está cerrado y muestra mensajes pendientes"""
+    global verificando_proceso, cola_mensajes
+
+    verificando_proceso = True
+
+    while server_running and len(cola_mensajes) > 0:
+        tiempo_espera = CONFIG["INTERVALO_VERIFICACION"]
+
+        if not proceso_esta_abierto(CONFIG["PROCESO_BLOQUEANTE"]):
+            # Proceso cerrado, mostrar el primer mensaje de la cola
+            if len(cola_mensajes) > 0:
+                mensaje = cola_mensajes.popleft()
+                logger.info(
+                    f"Proceso {CONFIG['PROCESO_BLOQUEANTE']} cerrado. Mostrando mensaje pendiente."
+                )
+                mostrar_alerta(mensaje)
+                time.sleep(1)  # Esperar un segundo antes de verificar el siguiente
+        else:
+            # Proceso sigue abierto, esperar
+            time.sleep(tiempo_espera)
+
+    verificando_proceso = False
 
 
 def mostrar_alerta(mensaje):
@@ -375,10 +423,26 @@ def iniciar_cliente():
                         f"Mensaje recibido de {addr}: {len(mensaje)} caracteres"
                     )
 
-                    # Ejecutar en thread separado para no bloquear el servidor
-                    thread = threading.Thread(target=mostrar_alerta, args=(mensaje,))
-                    thread.daemon = True
-                    thread.start()
+                    # Verificar si el proceso bloqueante está abierto
+                    if proceso_esta_abierto(CONFIG["PROCESO_BLOQUEANTE"]):
+                        logger.warning(
+                            f"Proceso {CONFIG['PROCESO_BLOQUEANTE']} está activo. Mensaje encolado."
+                        )
+                        cola_mensajes.append(mensaje)
+
+                        # Iniciar el hilo de verificación si no está corriendo
+                        if not verificando_proceso:
+                            thread_verificador = threading.Thread(
+                                target=verificar_y_mostrar_mensajes, daemon=True
+                            )
+                            thread_verificador.start()
+                    else:
+                        # Ejecutar en thread separado para no bloquear el servidor
+                        thread = threading.Thread(
+                            target=mostrar_alerta, args=(mensaje,)
+                        )
+                        thread.daemon = True
+                        thread.start()
 
                 except socket.timeout:
                     logger.error(f"Timeout en recepción de datos desde {addr}")
@@ -387,8 +451,8 @@ def iniciar_cliente():
                 finally:
                     try:
                         conn.close()
-                    except:
-                        pass
+                    except (OSError, Exception) as e:
+                        logger.debug(f"Error cerrando conexión: {e}")
 
             except socket.timeout:
                 continue
@@ -407,8 +471,8 @@ def iniciar_cliente():
             try:
                 server_socket.close()
                 logger.info("Servidor cerrado correctamente")
-            except:
-                pass
+            except (OSError, Exception) as e:
+                logger.debug(f"Error cerrando socket: {e}")
 
 
 def manejar_signal(signum, frame):
@@ -419,7 +483,7 @@ def manejar_signal(signum, frame):
     if server_socket:
         try:
             server_socket.close()
-        except:
+        except:  # noqa: E722
             pass
     sys.exit(0)
 
@@ -429,6 +493,7 @@ if __name__ == "__main__":
     logger.info("ESCLAVO - Servidor de Notificaciones")
     logger.info("=" * 60)
     logger.info(f"HOST: {CONFIG['HOST']}, PORT: {CONFIG['PORT']}")
+    logger.info(f"Proceso bloqueante: {CONFIG['PROCESO_BLOQUEANTE']}")
 
     # Registrar handlers para shutdown graceful
     signal.signal(signal.SIGINT, manejar_signal)
@@ -436,6 +501,9 @@ if __name__ == "__main__":
 
     try:
         iniciar_cliente()
+    except KeyboardInterrupt:
+        logger.info("Interrupción del usuario")
+        sys.exit(0)
     except Exception as e:
         logger.critical(f"Error crítico: {e}", exc_info=True)
         sys.exit(1)
