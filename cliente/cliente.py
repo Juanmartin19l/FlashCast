@@ -67,13 +67,11 @@ def mostrar_alerta(mensaje):
 
     # Colores corporativos - Celeste
     COLOR_PRIMARIO = "#0ea5e9"
-    COLOR_PRIMARIO_HOVER = "#38bdf8"
     COLOR_PRIMARIO_CLARO = "#e0f2fe"
     COLOR_FONDO = "#fafafa"
     COLOR_TEXTO = "#1f2937"
     COLOR_TEXTO_SECUNDARIO = "#6b7280"
     COLOR_BORDE = "#e5e7eb"
-    COLOR_EXITO = "#22c55e"
     COLOR_ERROR = "#ef4444"
     COLOR_BLANCO = "#FFFFFF"
 
