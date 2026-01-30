@@ -26,13 +26,13 @@ function conectarStream() {
 
       if (data.enviando) {
         btnEnviar.disabled = true;
-        btnEnviar.textContent = '⏳ ENVIANDO...';
+        btnEnviar.textContent = 'Enviando...';
         btnCancelar.style.display = 'block';
         btnCancelar.disabled = false;
-        btnCancelar.textContent = '🛑 CANCELAR ENVÍO';
+        btnCancelar.textContent = 'Cancelar envío';
       } else {
         btnEnviar.disabled = false;
-        btnEnviar.textContent = '📤 ENVIAR MENSAJE A TODA LA RED';
+        btnEnviar.textContent = 'Enviar a toda la red';
         btnCancelar.style.display = 'none';
       }
       return;
@@ -79,7 +79,7 @@ btnEnviar.addEventListener('click', async function () {
       logContainer.innerHTML = '';
 
       btnEnviar.disabled = true;
-      btnEnviar.textContent = '⏳ ENVIANDO...';
+      btnEnviar.textContent = 'Enviando...';
       btnCancelar.style.display = 'block';
     } else {
       alert(`Error: ${data.error}`);
@@ -104,7 +104,7 @@ btnCancelar.addEventListener('click', async function () {
 
     if (response.ok) {
       btnCancelar.disabled = true;
-      btnCancelar.textContent = '⏳ CANCELANDO...';
+      btnCancelar.textContent = 'Cancelando...';
     } else {
       console.error('Error cancelando:', data.error);
     }

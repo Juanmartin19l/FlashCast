@@ -12,30 +12,20 @@
 <body>
   <div class="container">
     <header>
+      <div class="logo">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M13 10V3L4 14h7v7l9-11h-7z" fill="currentColor" />
+        </svg>
+      </div>
       <h1>FlashCast</h1>
       <p class="subtitle">Sistema de notificaciones en red local</p>
     </header>
 
     <div class="content">
-      <div class="log-section">
-        <div class="log-header">
-          <h2>📋 Log de IPs alcanzadas</h2>
-          <div class="log-stats">
-            <div class="mini-stat">
-              <span class="mini-label">Enviados:</span>
-              <span id="contador" class="mini-value">0</span>
-            </div>
-            <div class="mini-stat">
-              <span class="mini-label">Historial:</span>
-              <span id="historial" class="mini-value">0</span>
-            </div>
-          </div>
-        </div>
-        <div id="log" class="log-container"></div>
-      </div>
-
       <div class="mensaje-section">
-        <h2>📤 Mensaje a enviar</h2>
+        <div class="section-header">
+          <h2>Mensaje a enviar</h2>
+        </div>
         <textarea id="mensaje" placeholder="Escribe aquí el mensaje que deseas enviar a todos los equipos..."># Notificación Importante
 
 ## Mensaje de la gerencia
@@ -49,13 +39,32 @@ El sistema soporta:
 
 Personaliza este mensaje según tus necesidades.</textarea>
 
-        <button id="btnEnviar" class="btn-enviar">
-          📤 ENVIAR MENSAJE A TODA LA RED
-        </button>
+        <div class="btn-group">
+          <button id="btnEnviar" class="btn-enviar">
+            Enviar a toda la red
+          </button>
 
-        <button id="btnCancelar" class="btn-cancelar" style="display: none;">
-          🛑 CANCELAR ENVÍO
-        </button>
+          <button id="btnCancelar" class="btn-cancelar" style="display: none;">
+            Cancelar envío
+          </button>
+        </div>
+      </div>
+
+      <div class="log-section">
+        <div class="log-header">
+          <h2>Log de actividad</h2>
+          <div class="log-stats">
+            <div class="mini-stat">
+              <span class="mini-label">Enviados</span>
+              <span id="contador" class="mini-value">0</span>
+            </div>
+            <div class="mini-stat">
+              <span class="mini-label">Historial</span>
+              <span id="historial" class="mini-value">0</span>
+            </div>
+          </div>
+        </div>
+        <div id="log" class="log-container"></div>
       </div>
     </div>
   </div>
