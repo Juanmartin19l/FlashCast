@@ -227,14 +227,28 @@ def stream():
     """Server-Sent Events para actualizaciones en tiempo real"""
 
     def event_stream():
+        contador_heartbeat = 0
         while True:
             try:
                 # Obtener log de la cola
                 log_item = log_queue.get(timeout=1)
                 yield f"data: {json.dumps(log_item)}\n\n"
+                contador_heartbeat = 0
             except queue.Empty:
-                # Enviar heartbeat cada segundo
-                yield f"data: {json.dumps({'heartbeat': True})}\n\n"
+                # Enviar estadísticas cada 2 segundos (en lugar de solo heartbeat)
+                contador_heartbeat += 1
+                if contador_heartbeat >= 2:
+                    stats = {
+                        "type": "estadisticas",
+                        "contador": contador_enviados,
+                        "historial_total": len(historial_ips),
+                        "enviando": enviando,
+                    }
+                    yield f"data: {json.dumps(stats)}\n\n"
+                    contador_heartbeat = 0
+                else:
+                    # Enviar heartbeat
+                    yield f"data: {json.dumps({'heartbeat': True})}\n\n"
 
     return Response(event_stream(), mimetype="text/event-stream")
 

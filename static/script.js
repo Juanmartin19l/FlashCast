@@ -20,7 +20,32 @@ function conectarStream() {
       return; // Ignorar heartbeats
     }
 
-    // Agregar log
+    // Procesar estadísticas
+    if (data.type === 'estadisticas') {
+      contadorEl.textContent = data.contador;
+      historialEl.textContent = data.historial_total;
+
+      if (data.enviando) {
+        btnEnviar.disabled = true;
+        btnEnviar.textContent = '⏳ ENVIANDO...';
+        btnCancelar.style.display = 'block';
+        btnCancelar.disabled = false;
+        btnCancelar.textContent = '🛑 CANCELAR ENVÍO';
+        estado.className = 'estado enviando';
+        estado.innerHTML =
+          '<span class="status-icon">⏳</span><span class="status-text">Enviando mensajes a la red...</span>';
+      } else {
+        btnEnviar.disabled = false;
+        btnEnviar.textContent = '📤 ENVIAR MENSAJE A TODA LA RED';
+        btnCancelar.style.display = 'none';
+        estado.className = 'estado success';
+        estado.innerHTML =
+          '<span class="status-icon">✓</span><span class="status-text">Listo para enviar</span>';
+      }
+      return;
+    }
+
+    // Procesar logs
     const logEntry = document.createElement('div');
     logEntry.className = `log-entry ${data.tipo}`;
     logEntry.textContent = data.texto;
@@ -137,8 +162,6 @@ btnCancelar.addEventListener('click', async function () {
 
 // Inicializar
 conectarStream();
-actualizarEstadisticas();
-setInterval(actualizarEstadisticas, 500); // Actualizar cada 500ms
 
 // Focus en el textarea al cargar
 mensaje.focus();

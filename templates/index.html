@@ -16,8 +16,25 @@
     </header>
 
     <div class="content">
+      <div class="log-section">
+        <div class="log-header">
+          <h2>📋 Log de IPs alcanzadas</h2>
+          <div class="log-stats">
+            <div class="mini-stat">
+              <span class="mini-label">Enviados:</span>
+              <span id="contador" class="mini-value">0</span>
+            </div>
+            <div class="mini-stat">
+              <span class="mini-label">Historial:</span>
+              <span id="historial" class="mini-value">0</span>
+            </div>
+          </div>
+        </div>
+        <div id="log" class="log-container"></div>
+      </div>
+
       <div class="mensaje-section">
-        <h2>Escribe tu mensaje</h2>
+        <h2>📤 Mensaje a enviar</h2>
         <textarea id="mensaje" placeholder="Escribe aquí el mensaje que deseas enviar a todos los equipos..."># Notificación Importante
 
 ## Mensaje de la gerencia
@@ -31,6 +48,11 @@ El sistema soporta:
 
 Personaliza este mensaje según tus necesidades.</textarea>
 
+        <div id="estado" class="estado">
+          <span class="status-icon">✓</span>
+          <span class="status-text">Listo para enviar</span>
+        </div>
+
         <button id="btnEnviar" class="btn-enviar">
           📤 ENVIAR MENSAJE A TODA LA RED
         </button>
@@ -38,33 +60,6 @@ Personaliza este mensaje según tus necesidades.</textarea>
         <button id="btnCancelar" class="btn-cancelar" style="display: none;">
           🛑 CANCELAR ENVÍO
         </button>
-
-        <div id="estado" class="estado">
-          <span class="status-icon">✓</span>
-          <span class="status-text">Listo para enviar</span>
-        </div>
-
-        <div class="estadisticas">
-          <div class="stat-card">
-            <div class="stat-icon">📊</div>
-            <div class="stat-content">
-              <div class="stat-label">Mensajes enviados</div>
-              <div id="contador" class="stat-value">0</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">📚</div>
-            <div class="stat-content">
-              <div class="stat-label">IPs en historial</div>
-              <div id="historial" class="stat-value">0</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="log-section">
-        <h2>📋 Log de IPs alcanzadas</h2>
-        <div id="log" class="log-container"></div>
       </div>
     </div>
   </div>
