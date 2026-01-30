@@ -1,7 +1,8 @@
-# Dependencias del Sistema de Mensajería en Red Local
+# FlashCast - Network Broadcast Messaging System
+# Dependencies
 
-# Backend (Maestro)
+# Server (Broadcaster)
 flask>=3.0.0
 
-# Para generar ejecutable del esclavo
+# Client executable builder
 pyinstaller>=6.0.0

@@ -1,6 +1,44 @@
-historial_ips.json
-.venv/
+# FlashCast - .gitignore
+
+# Python
 __pycache__/
-dist/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.pyc
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# PyInstaller
+*.spec
 build/
-esclavo.spec
+dist/
+
+# Project Specific
+data/historial_ips.json
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation builds
+docs/_build/

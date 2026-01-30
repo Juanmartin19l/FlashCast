@@ -1,109 +1,109 @@
-# 📢 Sistema de Mensajería en Red Local
+# ⚡ FlashCast
 
-Sistema distribuido de mensajería corporativa para enviar notificaciones a múltiples máquinas Windows en una red local. Implementa una arquitectura maestro-esclavo.
+A distributed network messaging system for broadcasting instant notifications to multiple machines on a local network. Built with a server-client architecture for corporate environments.
 
-## 🏗️ Estructura del Proyecto
+## 🏗️ Project Structure
 
 ```
-MENSAJE/
-├── backend/                    # Servidor maestro
-│   └── maestro_web.py         # Servidor Flask + escaneo de red
+FlashCast/
+├── servidor/                   # Broadcast server
+│   └── servidor.py            # Flask server + network scanner
 │
-├── esclavo/                    # Cliente distribuible
-│   ├── esclavo.py             # Servicio que recibe mensajes
-│   └── INSTRUCCIONES_Esclavo.md
+├── cliente/                    # Client agent
+│   ├── cliente.py             # Message receiver service
+│   └── INSTRUCCIONES_Cliente.md
 │
-├── frontend/                   # Interfaz web
+├── frontend/                   # Web interface
 │   ├── templates/
-│   │   └── index.html         # Panel de control
+│   │   └── index.html         # Control panel
 │   └── static/
-│       ├── script.js          # Lógica frontend
-│       └── style.css          # Estilos
+│       ├── script.js          # Frontend logic
+│       └── style.css          # Styles
 │
-├── data/                       # Persistencia
-│   └── historial_ips.json     # Base de datos de IPs
+├── data/                       # Persistence
+│   └── historial_ips.json     # IP database
 │
-└── docs/                       # Documentación
-    ├── README_Maestro.md      # Guía del servidor
-    └── INSTRUCCIONES_Esclavo.md  # Guía del cliente
+└── docs/                       # Documentation
+    ├── README_Servidor.md     # Server guide
+    └── INSTRUCCIONES_Cliente.md  # Client guide
 ```
 
-## 🚀 Inicio Rápido
+## 🚀 Quick Start
 
-### Configuración Inicial
+### Initial Setup
 
 ```bash
-# 1. Clonar o descargar el repositorio
-cd MENSAJE
+# 1. Clone or download the repository
+cd FlashCast
 
-# 2. Crear entorno virtual (recomendado)
+# 2. Create virtual environment (recommended)
 python -m venv .venv
 
-# 3. Activar entorno virtual
+# 3. Activate virtual environment
 # Windows:
 .venv\Scripts\activate
 # Linux/Mac:
 source .venv/bin/activate
 
-# 4. Instalar dependencias
+# 4. Install dependencies
 pip install -r requirements.txt
 ```
 
-### Ejecutar el Servidor Maestro
+### Run the Server
 
 ```bash
-# Desde la carpeta raíz del proyecto
-python backend/maestro_web.py
+# From the project root
+python servidor/servidor.py
 
-# Abrir navegador en:
+# Open browser at:
 # http://localhost:8080
 ```
 
-### Generar Ejecutable del Cliente Esclavo
+### Build Client Executable
 
 ```bash
-# Activar entorno virtual primero (si no está activo)
+# Activate virtual environment first (if not already active)
 .venv\Scripts\activate  # Windows
 source .venv/bin/activate  # Linux/Mac
 
-# Generar ejecutable
-pyinstaller --onefile --noconsole esclavo/esclavo.py
+# Build executable
+pyinstaller --onefile --noconsole cliente/cliente.py
 
-# El ejecutable estará en: dist/esclavo.exe
-# Distribuirlo a las máquinas de la red
+# The executable will be in: dist/cliente.exe
+# Distribute to network machines
 ```
 
-## 📋 Componentes
+## 📋 Components
 
-### 🖥️ Maestro
+### 🖥️ Server
 
-- **Puerto Web**: 8080
-- **Puerto TCP**: 5000
-- **Funcionalidad**: Escanea red, envía mensajes, interfaz web
+- **Web Port**: 8080
+- **TCP Port**: 5000
+- **Features**: Network scanning, message broadcasting, web interface
 
-### 💻 Esclavo
+### 💻 Client
 
-- **Puerto**: 5000
-- **Funcionalidad**: Escucha mensajes, muestra alertas GUI
+- **Port**: 5000
+- **Features**: Listens for messages, displays GUI alerts
 
-## 📖 Documentación
+## 📖 Documentation
 
-- **[README_Maestro.md](docs/README_Maestro.md)**: Configuración y uso del servidor
-- **[INSTRUCCIONES_Esclavo.md](docs/INSTRUCCIONES_Esclavo.md)**: Instalación del cliente
+- **[README_Servidor.md](docs/README_Servidor.md)**: Server configuration and usage
+- **[INSTRUCCIONES_Cliente.md](docs/INSTRUCCIONES_Cliente.md)**: Client installation guide
 
-## ⚙️ Tecnologías
+## ⚙️ Technologies
 
-- **Backend**: Python, Flask, Socket, ThreadPoolExecutor
+- **Server**: Python, Flask, Socket, ThreadPoolExecutor
 - **Frontend**: HTML5, CSS3, JavaScript ES6, EventSource
-- **Cliente**: Python, Tkinter, Socket
+- **Client**: Python, Tkinter, Socket
 
-## 🔒 Seguridad
+## 🔒 Security
 
-- Solo accesible en red local
-- Límite de mensaje: 2048 bytes
-- Timeout de conexión: 0.3s
-- Validación de entrada
+- Local network only
+- Message limit: 2048 bytes
+- Connection timeout: 0.3s
+- Input validation
 
-## 📝 Licencia
+## 📝 License
 
-Proyecto interno corporativo.
+Internal corporate project.

@@ -1,8 +1,8 @@
-# 📢 Sistema Maestro - Panel de Control de Mensajería en Red
+# ⚡ FlashCast Server - Broadcast Control Panel
 
-## Descripción General
+## Overview
 
-El **Maestro** es un servidor web Flask que permite enviar mensajes masivos a todas las máquinas de la red local que tengan el **Esclavo** instalado y corriendo.
+The **FlashCast Server** is a Flask web server that enables mass messaging to all machines on the local network that have the **FlashCast Client** installed and running.
 
 ## Características
 
@@ -39,17 +39,17 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Ejecutar el Servidor
+### 2. Run the Server
 
 ```bash
-# Desde la carpeta raíz del proyecto
-python backend/maestro_web.py
+# From the project root
+python servidor/servidor.py
 ```
 
-El servidor iniciará en:
+The server will start on:
 
-- **Interfaz Web**: http://localhost:8080
-- **Servidor TCP**: Puerto 5000 (comunicación con esclavos)
+- **Web Interface**: http://localhost:8080
+- **TCP Server**: Port 5000 (client communication)
 
 ### 3. Acceder al Panel
 
@@ -65,15 +65,15 @@ Abre tu navegador y ve a: **http://localhost:8080**
 4. Observa el log en tiempo real de las IPs contactadas
 5. Puedes cancelar el envío en cualquier momento
 
-## Configuración
+## Configuration
 
-Las constantes se pueden ajustar en la parte superior de `backend/maestro_web.py`:
+Constants can be adjusted at the top of `servidor/servidor.py`:
 
 ```python
-PUERTO = 5000              # Puerto TCP para comunicación con esclavos
-TIMEOUT = 0.3              # Timeout por conexión (segundos)
-MAX_HILOS = 500            # Hilos concurrentes para envío
-MAX_CARACTERES = 2048      # Límite de caracteres del mensaje
+PUERTO = 5000              # TCP port for client communication
+TIMEOUT = 0.3              # Connection timeout (seconds)
+MAX_HILOS = 500            # Concurrent threads for sending
+MAX_CARACTERES = 2048      # Message character limit
 ```
 
 ## Estructura de Archivos
