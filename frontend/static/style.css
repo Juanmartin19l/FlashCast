@@ -140,42 +140,6 @@ h2 {
   transform: translateY(0);
 }
 
-.estado {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: #0f3460;
-  border-radius: 6px;
-  font-weight: 500;
-  color: white;
-  border: 1px solid #1a1a2e;
-  font-size: 0.85rem;
-  margin-bottom: 10px;
-}
-
-.status-icon {
-  font-size: 1.2rem;
-}
-
-.estado.enviando {
-  background: #f39c12;
-  color: white;
-  border-color: #f39c12;
-}
-
-.estado.success {
-  background: #27ae60;
-  color: white;
-  border-color: #27ae60;
-}
-
-.estado.error {
-  background: #e74c3c;
-  color: white;
-  border-color: #e74c3c;
-}
-
 .log-section {
   display: flex;
   flex-direction: column;

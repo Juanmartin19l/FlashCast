@@ -67,7 +67,7 @@ python servidor/servidor.py
 source .venv/bin/activate  # Linux/Mac
 
 # Build executable with FlashCast icon
-pyinstaller --onefile --noconsole --icon=frontend/static/flashcast.png cliente/cliente.py
+pyinstaller --onefile --noconsole --icon=cliente/flashcast.ico cliente/cliente.py
 
 # The executable will be in: dist/cliente.exe
 # Distribute to network machines

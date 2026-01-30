@@ -2,7 +2,6 @@
 const btnEnviar = document.getElementById('btnEnviar');
 const btnCancelar = document.getElementById('btnCancelar');
 const mensaje = document.getElementById('mensaje');
-const estado = document.getElementById('estado');
 const logContainer = document.getElementById('log');
 const contadorEl = document.getElementById('contador');
 const historialEl = document.getElementById('historial');
@@ -31,16 +30,10 @@ function conectarStream() {
         btnCancelar.style.display = 'block';
         btnCancelar.disabled = false;
         btnCancelar.textContent = '🛑 CANCELAR ENVÍO';
-        estado.className = 'estado enviando';
-        estado.innerHTML =
-          '<span class="status-icon">⏳</span><span class="status-text">Enviando mensajes a la red...</span>';
       } else {
         btnEnviar.disabled = false;
         btnEnviar.textContent = '📤 ENVIAR MENSAJE A TODA LA RED';
         btnCancelar.style.display = 'none';
-        estado.className = 'estado success';
-        estado.innerHTML =
-          '<span class="status-icon">✓</span><span class="status-text">Listo para enviar</span>';
       }
       return;
     }
@@ -61,43 +54,12 @@ function conectarStream() {
   };
 }
 
-// Actualizar estadísticas
-function actualizarEstadisticas() {
-  fetch('/api/estadisticas')
-    .then((response) => response.json())
-    .then((data) => {
-      contadorEl.textContent = data.contador;
-      historialEl.textContent = data.historial_total;
-
-      if (data.enviando) {
-        btnEnviar.disabled = true;
-        btnEnviar.textContent = '⏳ ENVIANDO...';
-        btnCancelar.style.display = 'block';
-        btnCancelar.disabled = false;
-        btnCancelar.textContent = '🛑 CANCELAR ENVÍO';
-        estado.className = 'estado enviando';
-        estado.innerHTML =
-          '<span class="status-icon">⏳</span><span class="status-text">Enviando mensajes a la red...</span>';
-      } else {
-        btnEnviar.disabled = false;
-        btnEnviar.textContent = '📤 ENVIAR MENSAJE A TODA LA RED';
-        btnCancelar.style.display = 'none';
-        estado.className = 'estado success';
-        estado.innerHTML =
-          '<span class="status-icon">✓</span><span class="status-text">Listo para enviar</span>';
-      }
-    })
-    .catch((error) => console.error('Error actualizando estadísticas:', error));
-}
-
 // Enviar mensaje
 btnEnviar.addEventListener('click', async function () {
   const textoMensaje = mensaje.value.trim();
 
   if (!textoMensaje) {
-    estado.className = 'estado error';
-    estado.innerHTML =
-      '<span class="status-icon">❌</span><span class="status-text">Debes escribir un mensaje</span>';
+    alert('Debes escribir un mensaje');
     return;
   }
 
@@ -119,18 +81,12 @@ btnEnviar.addEventListener('click', async function () {
       btnEnviar.disabled = true;
       btnEnviar.textContent = '⏳ ENVIANDO...';
       btnCancelar.style.display = 'block';
-      estado.className = 'estado enviando';
-      estado.innerHTML =
-        '<span class="status-icon">⏳</span><span class="status-text">Enviando mensajes a la red...</span>';
     } else {
-      estado.className = 'estado error';
-      estado.innerHTML = `<span class="status-icon">❌</span><span class="status-text">${data.error}</span>`;
+      alert(`Error: ${data.error}`);
     }
   } catch (error) {
     console.error('Error enviando mensaje:', error);
-    estado.className = 'estado error';
-    estado.innerHTML =
-      '<span class="status-icon">❌</span><span class="status-text">Error al conectar con el servidor</span>';
+    alert('Error al conectar con el servidor');
   }
 });
 
@@ -149,9 +105,6 @@ btnCancelar.addEventListener('click', async function () {
     if (response.ok) {
       btnCancelar.disabled = true;
       btnCancelar.textContent = '⏳ CANCELANDO...';
-      estado.className = 'estado error';
-      estado.innerHTML =
-        '<span class="status-icon">⚠️</span><span class="status-text">Cancelando envío...</span>';
     } else {
       console.error('Error cancelando:', data.error);
     }

@@ -104,7 +104,7 @@ The server will start on:
 ### Building the Client
 
 ```bash
-pyinstaller --onefile --noconsole cliente/cliente.py
+pyinstaller --onefile --noconsole --icon=cliente/flashcast.ico cliente/cliente.py
 ```
 
 The executable will be in `dist/cliente.exe` - distribute this to target machines.

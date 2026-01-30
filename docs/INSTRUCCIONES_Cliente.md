@@ -28,7 +28,7 @@ Si modificas el código fuente y necesitas volver a generar el ejecutable, sigue
 4. Genera el ejecutable:
 
    ```powershell
-   pyinstaller --onefile --noconsole esclavo/esclavo.py
+   pyinstaller --onefile --noconsole --icon=cliente/flashcast.ico cliente/cliente.py
    ```
 
 El archivo generado estará en la carpeta `dist/`.
