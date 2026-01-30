@@ -29,9 +29,9 @@ A powerful distributed network messaging system for broadcasting instant notific
 - 💻 IT department broadcasts
 - 📢 Company-wide communications
 
-## 🏗️ Architecture
+## Architecture
 
-```
+```terminal
 ┌─────────────────────────────────────────────────────────────┐
 │                     FlashCast Server                         │
 │  ┌──────────────┐  ┌─────────────┐  ┌──────────────────┐   │
@@ -85,6 +85,7 @@ A powerful distributed network messaging system for broadcasting instant notific
    ```
 
 3. **Install dependencies**
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -97,7 +98,7 @@ python servidor/servidor.py
 
 The server will start on:
 
-- 🌐 Web Interface: http://localhost:8080
+- 🌐 Web Interface: <http://localhost:8080>
 - 🔌 TCP Server: Port 5000
 
 ### Building the Client
@@ -179,70 +180,8 @@ Contributions are welcome! Here's how you can help:
 4. 📤 Push to the branch (`git push origin feature/AmazingFeature`)
 5. 🔃 Open a Pull Request
 
-### Areas for Contribution
-
-- [ ] Multi-language support
-- [ ] Message templates
-- [ ] Scheduled broadcasts
-- [ ] Group targeting
-- [ ] Delivery confirmation
-- [ ] Encrypted communications
-- [ ] REST API
-- [ ] Docker deployment
-- [ ] Web client version
-- [ ] Mobile client
-
-## 🐛 Bug Reports
-
-Found a bug? Please open an issue with:
-
-- Clear description of the problem
-- Steps to reproduce
-- Expected vs actual behavior
-- Environment details (OS, Python version)
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 👨‍💻 Author
-
-**Juan** - Network Systems Developer
-
-- LinkedIn: [Your LinkedIn](https://linkedin.com/in/yourprofile)
-- GitHub: [@yourusername](https://github.com/yourusername)
-
-## 🌟 Show Your Support
-
-Give a ⭐️ if this project helped you!
-
-## 📈 Roadmap
-
-- [x] Core broadcasting engine
-- [x] Web interface
-- [x] Real-time logging
-- [x] Client GUI
-- [x] Auto network discovery
-- [ ] Message templates
-- [ ] Scheduled broadcasts
-- [ ] Group targeting
-- [ ] Delivery confirmation
-- [ ] REST API
-- [ ] Docker support
-- [ ] Cloud deployment option
-
-## 🙏 Acknowledgments
-
-- Inspired by enterprise IT communication needs
-- Built with modern Python best practices
-- Thanks to the open-source community
-
 ---
-
-<div align="center">
 
 **[⬆ Back to Top](#-flashcast)**
 
 Made with ❤️ for the IT community
-
-</div>
