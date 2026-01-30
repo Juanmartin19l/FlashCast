@@ -13,10 +13,21 @@ import time
 PUERTO = 5000
 TIMEOUT = 0.3
 MAX_HILOS = 500
-ARCHIVO_HISTORIAL = "historial_ips.json"
+ARCHIVO_HISTORIAL = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data", "historial_ips.json"
+)
 MAX_CARACTERES = 2048  # Límite de caracteres del mensaje
 
-app = Flask(__name__)
+# Configurar Flask para usar las carpetas del frontend
+app = Flask(
+    __name__,
+    template_folder=os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "frontend", "templates"
+    ),
+    static_folder=os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "frontend", "static"
+    ),
+)
 
 # Variables globales
 log_queue = queue.Queue()

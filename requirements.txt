@@ -1,0 +1,7 @@
+# Dependencias del Sistema de Mensajería en Red Local
+
+# Backend (Maestro)
+flask>=3.0.0
+
+# Para generar ejecutable del esclavo
+pyinstaller>=6.0.0
