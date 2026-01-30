@@ -7,17 +7,19 @@ Sistema de mensajería distribuida para enviar notificaciones instantáneas a m�
 - 🚀 Transmisión masiva (500+ equipos simultáneamente)
 - 🌐 Interfaz web moderna
 - 📡 Monitoreo en tiempo real
-- 🔍 Descubrimiento automático de red
-- 💾 Historial de IPs para envíos optimizados
+- 🔍 Descubrimiento automático de red (hostname pattern TESO-\*)
+- 💾 Persistencia de máquinas en machines.json
 - 🛑 Control de cancelación de envíos
+- 🔄 Escaneo periódico en background (discovery service)
 
 ## 🏗️ Project Structure
 
-```
+```tree
 FlashCast/
 ├── servidor/                   # Broadcast server
 │   ├── backend/
-│   │   └── servidor.py        # Flask server + network scanner
+│   │   ├── servidor.py        # Flask server + message sender
+│   │   └── discovery_service.py  # Network discovery service (runs separately)
 │   ├── frontend/              # Web interface
 │   │   ├── templates/
 │   │   │   └── index.html     # Control panel
@@ -25,7 +27,7 @@ FlashCast/
 │   │       ├── script.js      # Frontend logic
 │   │       └── style.css      # Styles
 │   └── data/                  # Persistence
-│       └── historial_ips.json # IP database
+│       └── machines.json      # Hostname -> IP mapping
 │
 ├── cliente/                    # Client agent
 │   ├── cliente.py             # Message receiver service
@@ -33,8 +35,8 @@ FlashCast/
 │   └── INSTRUCCIONES_Cliente.md
 │
 └── docs/                       # Documentation
-    ├── README_Servidor.md     # Server guide
-    └── INSTRUCCIONES_Cliente.md  # Client guide
+    ├── INSTRUCCIONES_Servidor.md     # Server guide
+    └── INSTRUCCIONES_Cliente.md      # Client guide
 ```
 
 ## 🚀 Quick Start
@@ -56,15 +58,29 @@ source .venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 ```
 
-### 2. Ejecutar Servidor
+### 2. Ejecutar Discovery Service (en background)
+
+**Importante:** Este servicio debe ejecutarse continuamente para mantener actualizada la lista de máquinas.
+
+```bash
+# Opción 1: Ejecución en terminal (mantener abierto)
+python servidor/backend/discovery_service.py
+
+# Opción 2: Ejecución como servicio de Windows (recomendado)
+# Usar Task Scheduler o nssm para ejecutar al inicio
+```
+
+El servicio escanea la red cada 5 minutos buscando máquinas con patrón **TESO-\***.
+
+### 3. Ejecutar Servidor Web
 
 ```bash
 python servidor/backend/servidor.py
 ```
 
-Acceder a: **http://localhost:8080**
+Acceder a: **<http://localhost:8080>**
 
-### 3. Generar Cliente (.exe)
+### 4. Generar Cliente (.exe)
 
 ```bash
 pyinstaller --onefile --noconsole --icon=cliente/flashcast.ico cliente/cliente.py
@@ -72,12 +88,7 @@ pyinstaller --onefile --noconsole --icon=cliente/flashcast.ico cliente/cliente.p
 
 El ejecutable estará en `dist/cliente.exe` - distribuir a los equipos de la red.
 
-## � Documentation
-
-- [Server Guide](docs/INSTRUCCIONES_Servidor.md) - Detailed server configuration
-- [Client Installation](docs/INSTRUCCIONES_Cliente.md) - Client deployment guide
-
-## 🛠️ Stack Tecnológico
+## Stack Tecnológico
 
 **Servidor:** Python, Flask, Socket, ThreadPoolExecutor  
 **Frontend:** HTML5, CSS3, JavaScript ES6, SSE  
