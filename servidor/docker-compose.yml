@@ -7,8 +7,8 @@ services:
     image: flashcast-server:latest
     container_name: flashcast-server
     restart: always
-    # network_mode host requerido para enviar mensajes TCP a la red local
-    network_mode: host
+    ports:
+      - '8080:8080'
     volumes:
       - ./data:/app/data
     environment:
@@ -33,16 +33,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: flashcast-server:latest
+    image: flashcast-discovery:latest
     container_name: flashcast-discovery
     restart: always
-    # network_mode host requerido para ping y resolución DNS en red local
-    network_mode: host
     command: ['python', 'backend/discovery_service.py']
     volumes:
       - ./data:/app/data
     environment:
       - TZ=America/Argentina/Buenos_Aires
+      - NETWORK_PREFIX=${NETWORK_PREFIX:-10.6}
     logging:
       driver: json-file
       options:
