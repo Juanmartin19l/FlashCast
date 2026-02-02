@@ -164,9 +164,44 @@ def cancelar():
         return jsonify({"error": "No hay ningún envío en progreso"}), 400
 
     cancelar_envio = True
-    agregar_log("⚠️ Solicitando cancelación...", "info")
+    agregar_log("Solicitando cancelación...", "info")
 
     return jsonify({"success": True, "message": "Cancelación solicitada"})
+
+
+@app.route("/api/machines", methods=["GET"])
+def obtener_machines():
+    """Obtiene el contenido de machines.json"""
+    maquinas = cargar_maquinas()
+    return jsonify(maquinas)
+
+
+@app.route("/api/machines", methods=["POST"])
+def guardar_machines():
+    """Guarda el contenido de machines.json"""
+    try:
+        data = request.json
+
+        # Validar que sea un diccionario
+        if not isinstance(data, dict):
+            return jsonify({"error": "El contenido debe ser un objeto JSON"}), 400
+
+        # Guardar en archivo
+        os.makedirs(os.path.dirname(ARCHIVO_MAQUINAS), exist_ok=True)
+        with open(ARCHIVO_MAQUINAS, "w") as f:
+            json.dump(data, f, indent=2)
+
+        # Actualizar cache
+        global maquinas_cache
+        maquinas_cache = data
+
+        agregar_log(f"Machines.json actualizado con {len(data)} máquinas", "success")
+
+        return jsonify(
+            {"success": True, "message": f"Se guardaron {len(data)} máquinas"}
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/estadisticas")
