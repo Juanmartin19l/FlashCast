@@ -58,27 +58,25 @@ source .venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 ```
 
-### 2. Ejecutar Discovery Service (en background)
-
-**Importante:** Este servicio debe ejecutarse continuamente para mantener actualizada la lista de máquinas.
+### 2. Ejecutar Servidor Web (en Docker)
 
 ```bash
-# Opción 1: Ejecución en terminal (mantener abierto)
-python servidor/backend/discovery_service.py
-
-# Opción 2: Ejecución como servicio de Windows (recomendado)
-# Usar Task Scheduler o nssm para ejecutar al inicio
-```
-
-El servicio escanea la red cada 5 minutos buscando máquinas con patrón **TESO-\***.
-
-### 3. Ejecutar Servidor Web
-
-```bash
-python servidor/backend/servidor.py
+cd servidor/
+docker compose up --build
 ```
 
 Acceder a: **<http://localhost:8080>**
+
+### 3. Ejecutar Discovery Service (en tu máquina local)
+
+**Importante:** Este servicio debe ejecutarse en tu máquina local (no en Docker) para escanear la red real.
+
+```bash
+# En otra terminal
+python servidor/backend/discovery_service.py
+```
+
+El servicio escanea la red cada 5 minutos buscando máquinas con patrón **TESO-\*** y actualiza `machines.json`.
 
 ### 4. Generar Cliente (.exe)
 

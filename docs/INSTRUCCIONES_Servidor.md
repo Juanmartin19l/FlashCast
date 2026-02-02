@@ -7,21 +7,23 @@ The **FlashCast Server** is a Flask web server that enables mass messaging to al
 ## Características
 
 - 🌐 **Interfaz Web Moderna**: Panel de control accesible desde el navegador
-- 🔍 **Escaneo Automático de Red**: Detecta automáticamente dispositivos en la red local
+- 🔍 **Descubrimiento de Máquinas**: Detecta dispositivos en la red local (ejecutado localmente)
 - 📨 **Envío Masivo Concurrente**: Utiliza 500 hilos para envío rápido
-- 💾 **Historial Inteligente**: Guarda IPs contactadas para priorizar en próximos envíos
+- 💾 **Persistencia de Máquinas**: Guarda máquinas en machines.json
 - 📡 **Actualizaciones en Tiempo Real**: Server-Sent Events (SSE) para logs dinámicos
 - 🛑 **Cancelación de Envíos**: Posibilidad de detener un envío en progreso
+- 🐳 **Containerizado**: Ejecuta en Docker para fácil despliegue
 
 ## Requisitos
 
-- Python 3.x
-- Flask (`pip install flask`)
+- Python 3.12+
+- Docker y Docker Compose (para el servidor)
+- Flask (para discovery_service local)
 - Acceso a la red local
 
 ## Instalación y Uso
 
-### 1. Configurar el Entorno
+### 1. Instalar Dependencias Locales
 
 ```bash
 # Desde la carpeta raíz del proyecto
@@ -39,23 +41,33 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Run the Server
+### 2. Ejecutar el Servidor Web (Docker)
 
 ```bash
-# From the project root
-python servidor/servidor.py
+cd servidor/
+docker compose up --build
 ```
 
-The server will start on:
+El servidor estará disponible en:
 
 - **Web Interface**: http://localhost:8080
-- **TCP Server**: Port 5000 (client communication)
+- **TCP Server**: Port 5000 (comunicación con clientes)
 
-### 3. Acceder al Panel
+### 3. Ejecutar Discovery Service (Local)
+
+**En otra terminal**, ejecuta:
+
+```bash
+python servidor/backend/discovery_service.py
+```
+
+Este servicio escanea la red cada 5 minutos buscando máquinas con patrón **TESO-\*** y actualiza `machines.json`.
+
+### 4. Acceder al Panel
 
 Abre tu navegador y ve a: **http://localhost:8080**
 
-### 4. Enviar Mensajes
+### 5. Enviar Mensajes
 
 1. Escribe el mensaje en el área de texto
 2. El mensaje soporta formato markdown simplificado:
@@ -65,15 +77,39 @@ Abre tu navegador y ve a: **http://localhost:8080**
 4. Observa el log en tiempo real de las IPs contactadas
 5. Puedes cancelar el envío en cualquier momento
 
-## Configuration
+## Configuración
 
-Constants can be adjusted at the top of `servidor/backend/servidor.py`:
+### Servidor Web
+
+Las constantes pueden ajustarse en `servidor/backend/servidor.py`:
 
 ```python
-PUERTO = 5000              # TCP port for client communication
-TIMEOUT = 0.3              # Connection timeout (seconds)
-MAX_HILOS = 500            # Concurrent threads for sending
-MAX_CARACTERES = 2048      # Message character limit
+PUERTO = 5000              # Puerto TCP para comunicación con clientes
+TIMEOUT = 0.3              # Timeout de conexión (segundos)
+MAX_HILOS = 500            # Hilos concurrentes para envío
+MAX_CARACTERES = 2048      # Límite de caracteres del mensaje
+```
+
+### Discovery Service
+
+Las variables de entorno pueden configurarse en el terminal:
+
+```bash
+# Red a escanear (por defecto: 10.6)
+set NETWORK_PREFIX=10.6  # Windows
+export NETWORK_PREFIX=10.6  # Linux/Mac
+
+# Patrón de hostname (por defecto: TESO-)
+set HOSTNAME_PATTERN=TESO-  # Windows
+export HOSTNAME_PATTERN=TESO-  # Linux/Mac
+
+# Intervalo de escaneo en segundos (por defecto: 300 = 5 minutos)
+set SCAN_INTERVAL=300  # Windows
+export SCAN_INTERVAL=300  # Linux/Mac
+
+# Número de workers para el escaneo (por defecto: 100)
+set SCAN_WORKERS=100  # Windows
+export SCAN_WORKERS=100  # Linux/Mac
 ```
 
 ## Estructura de Archivos
@@ -129,23 +165,31 @@ data/
 
 ## Solución de Problemas
 
-### El servidor no inicia
+### El servidor Docker no inicia
 
-- Verifica que el puerto 8080 no esté en uso
-- Verifica que el puerto 5000 esté libre
-- Comprueba que Flask esté instalado
+- Verifica que el puerto 8080 no esté en uso: `netstat -ano | findstr :8080`
+- Verifica que Docker esté corriendo
+- Revisa los logs: `docker compose logs`
 
-### Los mensajes no llegan a los esclavos
+### Discovery Service no encuentra máquinas
+
+- Verifica que estés ejecutándolo en tu máquina local (NO en Docker)
+- Verifica el patrón de hostname: `ipconfig /all` (Windows) o `ifconfig` (Linux/Mac)
+- Ajusta `NETWORK_PREFIX` si tu red no es `10.6.x.x`
+- Verifica el firewall local permite ping
+
+### Los mensajes no llegan a los clientes
 
 - Verifica que el firewall permita conexiones TCP al puerto 5000
-- Confirma que los esclavos estén ejecutándose
-- Revisa los logs del servidor en la consola
+- Confirma que los clientes estén ejecutándose
+- Revisa los logs en tiempo real en la interfaz web
+- Verifica que las máquinas están en `machines.json`
 
 ### El escaneo es muy lento
 
-- Ajusta `TIMEOUT` a un valor menor (ej: 0.2)
-- Aumenta `MAX_HILOS` para más concurrencia
-- Considera reducir el rango de IPs a escanear
+- Aumenta `SCAN_WORKERS` (ej: 200)
+- Reduce `PING_TIMEOUT_VALUE` en discovery_service.py
+- Considera reducir el rango de IPs a escanear en `NETWORK_PREFIX`
 
 ## Mantenimiento
 
