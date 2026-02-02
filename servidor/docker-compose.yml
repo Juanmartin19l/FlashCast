@@ -27,26 +27,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-
-  # Servicio de descubrimiento de máquinas
-  flashcast-discovery:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: flashcast-discovery:latest
-    container_name: flashcast-discovery
-    restart: always
-    command: ['python', 'backend/discovery_service.py']
-    volumes:
-      - ./data:/app/data
-    environment:
-      - TZ=America/Argentina/Buenos_Aires
-      - NETWORK_PREFIX=${NETWORK_PREFIX:-10.6}
-    logging:
-      driver: json-file
-      options:
-        max-size: '10m'
-        max-file: '3'
-    depends_on:
-      flashcast-server:
-        condition: service_healthy

@@ -90,7 +90,7 @@ def iniciar_bombardeo(mensaje):
 
     agregar_log("🚀 Iniciando envío masivo...", "info")
 
-    # Recargar machines.json (puede haber sido actualizado por discovery_service)
+    # Recargar machines.json (actualizado manualmente por discovery_service)
     maquinas_cache = cargar_maquinas()
 
     # Extraer IPs del JSON
@@ -103,7 +103,10 @@ def iniciar_bombardeo(mensaje):
 
     if not ips:
         agregar_log("⚠️ No hay máquinas en machines.json", "error")
-        agregar_log("💡 Ejecuta discovery_service.py para encontrar máquinas", "info")
+        agregar_log(
+            "💡 Ejecuta discovery_service.py en tu máquina local para agregar máquinas",
+            "info",
+        )
         enviando = False
         return
 
@@ -251,6 +254,8 @@ if __name__ == "__main__":
     maquinas_cache = cargar_maquinas()
     print("🚀 Servidor web iniciado en http://localhost:8080")
     print("📢 Abre tu navegador y ve a esa dirección")
-    print("💡 Asegúrate de ejecutar discovery_service.py para actualizar machines.json")
+    print(
+        "💡 Ejecuta discovery_service.py en tu máquina local para actualizar machines.json"
+    )
     print(f"📚 Máquinas cargadas: {len(maquinas_cache)}")
     app.run(host="0.0.0.0", port=8080, debug=False, threaded=True)
