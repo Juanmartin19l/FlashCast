@@ -97,9 +97,12 @@ def iniciar_bombardeo(mensaje):
     ips = []
     for hostname, data in maquinas_cache.items():
         if isinstance(data, dict) and "ip" in data:
-            ips.append(data["ip"])
+            ip = data["ip"]
+            if ip not in ips:
+                ips.append(ip)
         elif isinstance(data, str):
-            ips.append(data)
+            if data not in ips:
+                ips.append(data)
 
     if not ips:
         agregar_log("⚠️ No hay máquinas en machines.json", "error")
