@@ -174,9 +174,6 @@ btnEnviar.addEventListener('click', async function () {
       // Limpiar log anterior
       logContainer.innerHTML = '';
 
-      // Limpiar el mensaje enviado
-      mensaje.value = '';
-
       btnEnviar.disabled = true;
       btnEnviar.textContent = 'Enviando...';
       btnCancelar.style.display = 'block';

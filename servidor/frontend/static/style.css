@@ -286,7 +286,7 @@ header h1 {
 
 .content {
   display: grid;
-  grid-template-columns: 1fr 2fr;
+  grid-template-columns: 1fr 1fr;
   gap: 24px;
   animation: fadeIn 0.6s ease 0.1s backwards;
   height: calc(100vh - 220px);
@@ -431,12 +431,9 @@ h2 {
 
 .mini-stat {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  padding: 10px 16px;
-  background: var(--bg-tertiary);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-color);
+  gap: 8px;
 }
 
 .mini-label {
@@ -444,7 +441,6 @@ h2 {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 4px;
 }
 
 .mini-value {
