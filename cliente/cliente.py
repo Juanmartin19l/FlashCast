@@ -87,24 +87,23 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
     root = tk.Toplevel(parent_root)
     root.overrideredirect(True)
 
-    # Colores corporativos - Celeste
-    COLOR_PRIMARIO = "#0ea5e9"
-    COLOR_PRIMARIO_CLARO = "#e0f2fe"
-    COLOR_FONDO = "#fafafa"
-    COLOR_TEXTO = "#1f2937"
-    COLOR_TEXTO_SECUNDARIO = "#6b7280"
-    COLOR_BORDE = "#e5e7eb"
-    COLOR_ERROR = "#ef4444"
-    COLOR_BLANCO = "#FFFFFF"
+    COLOR_PRIMARIO = "#0f766e"
+    COLOR_PRIMARIO_CLARO = "#ccfbf1"
+    COLOR_FONDO = "#f5f7f4"
+    COLOR_PANEL = "#fffdf8"
+    COLOR_TEXTO = "#17212b"
+    COLOR_TEXTO_SECUNDARIO = "#5f6b76"
+    COLOR_BORDE = "#d7e0d9"
+    COLOR_ERROR = "#c2410c"
+    COLOR_BLANCO = "#ffffff"
 
     root.attributes("-topmost", True)
     root.configure(bg=COLOR_FONDO)
 
-    # Centrar ventana
-    ancho_ventana = 720
+    ancho_ventana = 940
     ancho_pantalla = root.winfo_screenwidth()
     alto_pantalla = root.winfo_screenheight()
-    alto_ventana = min(600, max(420, alto_pantalla - 80))
+    alto_ventana = min(720, max(520, alto_pantalla - 70))
     x = (ancho_pantalla - ancho_ventana) // 2
     y = (alto_pantalla - alto_ventana) // 2
 
@@ -126,7 +125,7 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
     # Frame principal con padding
     main_frame = tk.Frame(outer_canvas, bg=COLOR_FONDO)
     main_window = outer_canvas.create_window((0, 0), window=main_frame, anchor="nw")
-    main_frame.configure(padx=28, pady=24)
+    main_frame.configure(padx=40, pady=30)
 
     def actualizar_scroll_principal(event=None):
         outer_canvas.configure(scrollregion=outer_canvas.bbox("all"))
@@ -143,55 +142,65 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
     outer_canvas.bind("<Configure>", ajustar_ancho_principal)
     root.bind("<MouseWheel>", on_outer_mousewheel)
 
-    # Banner "Notificación Importante"
+    encabezado = tk.Frame(main_frame, bg=COLOR_FONDO)
+    encabezado.pack(fill=tk.X, pady=(0, 18))
+
     banner = tk.Label(
-        main_frame,
+        encabezado,
         text="NOTIFICACIÓN IMPORTANTE",
         font=font.Font(family="Segoe UI", size=10, weight="bold"),
         fg=COLOR_PRIMARIO,
         bg=COLOR_PRIMARIO_CLARO,
         anchor="w",
-        padx=14,
-        pady=12,
+        padx=16,
+        pady=10,
     )
-    banner.pack(fill=tk.X, pady=(0, 12))
+    banner.pack(anchor="w")
 
-    altura_mensaje = 300 if archivo_nombre else 380
+    tk.Label(
+        encabezado,
+        text="Revise el contenido y confirme para continuar.",
+        font=font.Font(family="Segoe UI", size=12),
+        fg=COLOR_TEXTO_SECUNDARIO,
+        bg=COLOR_FONDO,
+        anchor="w",
+    ).pack(fill=tk.X, pady=(12, 0))
 
-    # Frame externo para el mensaje con borde sutil
-    mensaje_outer_frame = tk.Frame(main_frame, bg=COLOR_BORDE)
-    mensaje_outer_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 12))
-    mensaje_outer_frame.pack_propagate(False)
-    mensaje_outer_frame.configure(height=altura_mensaje)
+    mensaje_panel = tk.Frame(
+        main_frame,
+        bg=COLOR_PANEL,
+        highlightbackground=COLOR_BORDE,
+        highlightthickness=1,
+        padx=28,
+        pady=24,
+    )
+    mensaje_panel.pack(fill=tk.X, pady=(0, 16))
 
-    # Frame interno del mensaje con diseño limpio
-    mensaje_frame = tk.Frame(mensaje_outer_frame, bg=COLOR_BLANCO)
-    mensaje_frame.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
-
-    # Canvas con scrollbar para mensajes largos
-    canvas = tk.Canvas(mensaje_frame, bg=COLOR_BLANCO, highlightthickness=0)
-    scrollbar = tk.Scrollbar(mensaje_frame, orient="vertical", command=canvas.yview)
-
-    # Frame para el contenido del mensaje dentro del canvas
-    contenido_frame = tk.Frame(canvas, bg=COLOR_BLANCO)
-
-    # Configurar canvas ANTES de crear la ventana
-    canvas.configure(yscrollcommand=scrollbar.set)
+    tk.Label(
+        mensaje_panel,
+        text="Mensaje",
+        font=font.Font(family="Segoe UI", size=11, weight="bold"),
+        fg=COLOR_TEXTO_SECUNDARIO,
+        bg=COLOR_PANEL,
+        anchor="w",
+    ).pack(fill=tk.X, pady=(0, 10))
 
     mensaje_text = tk.Text(
-        contenido_frame,
+        mensaje_panel,
         font=font.Font(family="Segoe UI", size=14),
         fg=COLOR_TEXTO,
-        bg=COLOR_BLANCO,
+        bg=COLOR_PANEL,
         wrap=tk.WORD,
-        padx=24,
-        pady=24,
+        padx=0,
+        pady=0,
         state="disabled",
-        width=70,
+        width=84,
         relief=tk.FLAT,
         borderwidth=0,
+        highlightthickness=0,
+        cursor="arrow",
     )
-    mensaje_text.pack(fill=tk.BOTH, expand=True)
+    mensaje_text.pack(fill=tk.X)
 
     # Configurar tags para formato
     mensaje_text.tag_config(
@@ -228,8 +237,9 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
                 procesar_linea_con_negritas(linea + "\n")
 
         mensaje_text.config(state="disabled")
-        # Actualizar el tamaño del frame contenedor
-        contenido_frame.update_idletasks()
+        mensaje_text.update_idletasks()
+        lineas_visibles = int(mensaje_text.count("1.0", "end-1c", "displaylines")[0])
+        mensaje_text.configure(height=max(8, lineas_visibles + 1))
 
     def procesar_linea_con_negritas(linea):
         """
@@ -265,46 +275,18 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
                 mensaje_text.insert(tk.END, contenido_bold, "bold")
                 pos = fin_bold + 2
 
-    # Mostrar el mensaje con formato Markdown
     mostrar_markdown(mensaje)
 
-    contenido_frame.update_idletasks()
-    contenido_width = contenido_frame.winfo_reqwidth()
-    contenido_height = contenido_frame.winfo_reqheight()
-
-    canvas_window = canvas.create_window(
-        (0, 0), window=contenido_frame, anchor="nw", width=contenido_width
-    )
-
-    canvas.update_idletasks()
-    canvas.configure(scrollregion=canvas.bbox("all"))
-
-    def actualizar_canvas_window(event=None):
-        """Actualizar ancho cuando el canvas se redimensiona"""
-        if event:
-            canvas.itemconfig(canvas_window, width=event.width - 2)
-
-    canvas.bind("<Configure>", actualizar_canvas_window)
-
-    def on_mousewheel_mensaje(event):
-        if contenido_height > canvas.winfo_height():
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-            return "break"
-
-    canvas.focus_set()
-    canvas.bind("<MouseWheel>", on_mousewheel_mensaje)
-
-    # Empaquetar canvas y scrollbar
-    canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-    # Separador
-    separator = tk.Frame(main_frame, height=1, bg=COLOR_BORDE)
-    separator.pack(fill=tk.X, pady=4)
-
     if archivo_nombre:
-        archivo_frame = tk.Frame(main_frame, bg=COLOR_PRIMARIO_CLARO)
-        archivo_frame.pack(fill=tk.X, pady=(8, 12))
+        archivo_frame = tk.Frame(
+            main_frame,
+            bg=COLOR_PRIMARIO_CLARO,
+            highlightbackground=COLOR_BORDE,
+            highlightthickness=1,
+            padx=18,
+            pady=16,
+        )
+        archivo_frame.pack(fill=tk.X, pady=(0, 16))
 
         tk.Label(
             archivo_frame,
@@ -313,19 +295,16 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
             fg=COLOR_PRIMARIO,
             bg=COLOR_PRIMARIO_CLARO,
             anchor="w",
-            padx=14,
-            pady=8,
         ).pack(fill=tk.X)
 
         tk.Label(
             archivo_frame,
             text=archivo_nombre,
-            font=font.Font(family="Segoe UI", size=11, weight="bold"),
+            font=font.Font(family="Segoe UI", size=13, weight="bold"),
             fg=COLOR_TEXTO,
             bg=COLOR_PRIMARIO_CLARO,
             anchor="w",
-            padx=14,
-        ).pack(fill=tk.X)
+        ).pack(fill=tk.X, pady=(6, 0))
 
         estado_descarga = tk.StringVar(
             value="El archivo se descargará cuando confirme el mensaje."
@@ -339,19 +318,24 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
             bg=COLOR_PRIMARIO_CLARO,
             anchor="w",
             justify=tk.LEFT,
-            padx=14,
-        ).pack(fill=tk.X, pady=(4, 8))
+        ).pack(fill=tk.X, pady=(6, 0))
 
-    # Instrucciones
-    instruccion_frame = tk.Frame(main_frame, bg=COLOR_FONDO)
-    instruccion_frame.pack(fill=tk.X, pady=(8, 12))
+    instruccion_frame = tk.Frame(
+        main_frame,
+        bg=COLOR_PANEL,
+        highlightbackground=COLOR_BORDE,
+        highlightthickness=1,
+        padx=24,
+        pady=18,
+    )
+    instruccion_frame.pack(fill=tk.X, pady=(0, 14))
 
     tk.Label(
         instruccion_frame,
         text='Escriba "CONFIRMAR" para cerrar.',
         font=font.Font(family="Segoe UI", size=10),
         fg=COLOR_TEXTO_SECUNDARIO,
-        bg=COLOR_FONDO,
+        bg=COLOR_PANEL,
         anchor="w",
         justify=tk.LEFT,
     ).pack(fill=tk.X)
@@ -362,16 +346,14 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
             text="Al confirmar, se solicitará una carpeta para descargar el adjunto.",
             font=font.Font(family="Segoe UI", size=10),
             fg=COLOR_TEXTO_SECUNDARIO,
-            bg=COLOR_FONDO,
+            bg=COLOR_PANEL,
             anchor="w",
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(4, 0))
 
-    # Frame para campo de texto y botón (en la misma línea)
     input_frame = tk.Frame(main_frame, bg=COLOR_FONDO)
-    input_frame.pack(fill=tk.X, pady=(0, 8))
+    input_frame.pack(fill=tk.X, pady=(0, 10))
 
-    # Campo de texto con borde
     entry_frame = tk.Frame(input_frame, bg=COLOR_BORDE, bd=0)
     entry_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 12))
 
@@ -462,7 +444,8 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
         padx=24,
         pady=10,
         cursor="hand2",
-        activebackground="#38bdf8",
+        activebackground="#115e59",
+        activeforeground=COLOR_BLANCO,
         relief=tk.FLAT,
         borderwidth=0,
     )

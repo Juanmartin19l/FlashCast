@@ -19,6 +19,13 @@ const btnCerrarModal = document.getElementById('btnCerrarModal');
 
 let eventSource = null;
 
+function limpiarFormularioEnvio() {
+  mensaje.value = '';
+  archivoInput.value = '';
+  archivoNombre.textContent = 'Ningún archivo seleccionado';
+  mensaje.focus();
+}
+
 // Sistema de notificaciones
 function mostrarNotificacion(mensaje, tipo = 'info', duracion = 4000) {
   const notificacion = document.createElement('div');
@@ -207,6 +214,10 @@ function enviarMensaje(mensaje, archivoNombre = null) {
     .then((data) => {
       if (data.success) {
         mostrarNotificacion('Mensaje enviado correctamente', 'success');
+        limpiarFormularioEnvio();
+        setTimeout(() => {
+          window.location.reload();
+        }, 800);
       } else {
         mostrarNotificacion('Error: ' + (data.error || data.message), 'error');
       }
