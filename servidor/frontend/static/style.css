@@ -652,3 +652,44 @@ h2 {
     bottom: 12px;
   }
 }
+
+/* Adjuntar archivo */
+.adjuntar-section {
+  margin: 18px 0 10px 0;
+  display: flex;
+  align-items: center;
+}
+
+.adjuntar-label {
+  display: flex;
+  align-items: center;
+  background: var(--bg-tertiary);
+  color: var(--accent-primary);
+  border: 1.5px dashed var(--accent-primary);
+  border-radius: var(--radius-md);
+  padding: 10px 18px;
+  font-weight: 500;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s, border 0.2s;
+  gap: 10px;
+}
+.adjuntar-label:hover {
+  background: var(--bg-secondary);
+  border-color: var(--accent-primary-hover);
+}
+.icon-clip {
+  font-size: 1.3em;
+  margin-right: 6px;
+}
+.archivo-nombre {
+  margin-left: 18px;
+  color: var(--text-muted);
+  font-size: 0.97em;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+  display: inline-block;
+}

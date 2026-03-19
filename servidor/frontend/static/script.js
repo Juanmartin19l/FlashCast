@@ -6,6 +6,9 @@ const mensaje = document.getElementById('mensaje');
 const logContainer = document.getElementById('log');
 const contadorEl = document.getElementById('contador');
 const historialEl = document.getElementById('historial');
+const archivoInput = document.getElementById('archivo');
+const archivoNombre = document.getElementById('archivo-nombre');
+const adjuntarLabel = document.querySelector('.adjuntar-label');
 
 // Modal
 const modalEditar = document.getElementById('modalEditar');
@@ -151,40 +154,67 @@ function conectarStream() {
 }
 
 // Enviar mensaje
-btnEnviar.addEventListener('click', async function () {
-  const textoMensaje = mensaje.value.trim();
+btnEnviar.addEventListener('click', function () {
+  const mensajeTexto = mensaje.value.trim();
+  const archivo = archivoInput.files[0];
 
-  if (!textoMensaje) {
+  if (!mensajeTexto) {
     mostrarNotificacion('Debes escribir un mensaje', 'error');
     return;
   }
 
-  try {
-    const response = await fetch('/api/enviar', {
+  if (archivo) {
+    // Subir archivo primero
+    const formData = new FormData();
+    formData.append('file', archivo);
+
+    fetch('/api/upload', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ mensaje: textoMensaje }),
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      // Limpiar log anterior
-      logContainer.innerHTML = '';
-
-      btnEnviar.disabled = true;
-      btnEnviar.textContent = 'Enviando...';
-      btnCancelar.style.display = 'block';
-    } else {
-      mostrarNotificacion('Error: ' + data.error, 'error');
-    }
-  } catch (error) {
-    console.error('Error enviando mensaje:', error);
-    mostrarNotificacion('Error al conectar con el servidor', 'error');
+      body: formData,
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          mostrarNotificacion('Archivo subido correctamente', 'success');
+          // Enviar mensaje junto con nombre del archivo
+          enviarMensaje(mensajeTexto, data.filename);
+        } else {
+          mostrarNotificacion('Error al subir archivo: ' + data.error, 'error');
+        }
+      })
+      .catch((err) => {
+        mostrarNotificacion('Error al subir archivo: ' + err, 'error');
+      });
+  } else {
+    // Solo enviar mensaje
+    enviarMensaje(mensajeTexto);
   }
 });
+
+function enviarMensaje(mensaje, archivoNombre = null) {
+  const payload = { mensaje };
+  if (archivoNombre) {
+    payload.archivo = archivoNombre;
+  }
+  fetch('/api/enviar', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        mostrarNotificacion('Mensaje enviado correctamente', 'success');
+      } else {
+        mostrarNotificacion('Error: ' + (data.error || data.message), 'error');
+      }
+    })
+    .catch((err) => {
+      mostrarNotificacion('Error al enviar mensaje: ' + err, 'error');
+    });
+}
 
 // Cancelar envío
 btnCancelar.addEventListener('click', async function () {
@@ -214,3 +244,12 @@ conectarStream();
 
 // Focus en el textarea al cargar
 mensaje.focus();
+
+// Actualizar el nombre del archivo seleccionado
+archivoInput.addEventListener('change', function () {
+  if (archivoInput.files.length > 0) {
+    archivoNombre.textContent = archivoInput.files[0].name;
+  } else {
+    archivoNombre.textContent = 'Ningún archivo seleccionado';
+  }
+});

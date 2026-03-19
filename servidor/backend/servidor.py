@@ -2,10 +2,11 @@ import socket
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, send_from_directory
 import threading
 import queue
 import time
+from werkzeug.utils import secure_filename
 
 # --- CONFIGURACIÓN ---
 PUERTO = 5000
@@ -35,6 +36,12 @@ lock = threading.Lock()
 enviando = False
 cancelar_envio = False
 
+# Carpeta para subir documentos
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
 
 def cargar_maquinas():
     """Carga la lista de máquinas desde machines.json"""
@@ -51,6 +58,10 @@ def cargar_maquinas():
 def agregar_log(texto, tipo="info"):
     """Agrega una línea al log"""
     log_queue.put({"texto": texto, "tipo": tipo, "timestamp": time.time()})
+
+
+def allowed_file(filename):
+    return bool(filename and secure_filename(filename))
 
 
 def enviar_a_ip(ip, mensaje):
@@ -140,6 +151,8 @@ def enviar_mensaje():
 
     data = request.json
     mensaje = data.get("mensaje", "").strip()
+    archivo = data.get("archivo")
+    print(f"[DEBUG] /api/enviar recibido: mensaje='{mensaje}', archivo='{archivo}'")
 
     if not mensaje:
         return jsonify({"error": "Debes escribir un mensaje"}), 400
@@ -156,9 +169,12 @@ def enviar_mensaje():
             400,
         )
 
-    # Ejecutar en hilo separado
-    threading.Thread(target=iniciar_bombardeo, args=(mensaje,), daemon=True).start()
+    # Siempre enviar JSON a los clientes (aunque no haya archivo)
+    mensaje_envio = json.dumps({"mensaje": mensaje, "archivo": archivo} if archivo else {"mensaje": mensaje}, ensure_ascii=False)
+    print(f"[DEBUG] Enviando a clientes: {mensaje_envio}")
 
+    # Ejecutar en hilo separado
+    threading.Thread(target=iniciar_bombardeo, args=(mensaje_envio,), daemon=True).start()
     return jsonify({"success": True, "message": "Envío iniciado"})
 
 
@@ -208,6 +224,34 @@ def guardar_machines():
         )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/upload", methods=["POST"])
+def upload_file():
+    if "file" not in request.files:
+        return jsonify({"error": "No se envió ningún archivo"}), 400
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No se seleccionó ningún archivo"}), 400
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        file.save(save_path)
+        agregar_log(f"Archivo subido: {filename}", "success")
+        return jsonify({"success": True, "filename": filename, "message": "Archivo subido correctamente"})
+    else:
+        return jsonify({"error": "Nombre de archivo inválido"}), 400
+
+
+@app.route("/api/download/<filename>", methods=["GET"])
+def download_file(filename):
+    # Validar que el nombre sea seguro antes de servir el archivo
+    if not allowed_file(filename):
+        return jsonify({"error": "Nombre de archivo inválido"}), 400
+    try:
+        return send_from_directory(app.config["UPLOAD_FOLDER"], filename, as_attachment=True)
+    except FileNotFoundError:
+        return jsonify({"error": "Archivo no encontrado"}), 404
 
 
 @app.route("/api/estadisticas")
