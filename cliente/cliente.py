@@ -426,11 +426,20 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
                     return
 
                 estado_descarga.set(f"Archivo descargado en: {ruta_descargada}")
-                messagebox.showinfo(
-                    "Descarga completada",
-                    f"El archivo se descargó correctamente en:\n{ruta_descargada}",
-                    parent=root,
-                )
+                archivo_abierto = abrir_archivo_descargado(ruta_descargada)
+
+                if archivo_abierto:
+                    messagebox.showinfo(
+                        "Descarga completada",
+                        f"El archivo se descargó y abrió correctamente:\n{ruta_descargada}",
+                        parent=root,
+                    )
+                else:
+                    messagebox.showwarning(
+                        "Descarga completada",
+                        f"El archivo se descargó correctamente, pero no se pudo abrir automáticamente:\n{ruta_descargada}",
+                        parent=root,
+                    )
 
             logger.info("Confirmación exitosa por usuario")
             root.destroy()
@@ -652,6 +661,17 @@ def descargar_documento(
     except Exception as e:
         logger.error(f"Error en la descarga desde {url}: {e}")
         return None
+
+
+def abrir_archivo_descargado(ruta_archivo):
+    """Abre el archivo descargado con la aplicación predeterminada del sistema."""
+    try:
+        os.startfile(ruta_archivo)
+        logger.info(f"Archivo abierto automáticamente: {ruta_archivo}")
+        return True
+    except OSError as e:
+        logger.error(f"No se pudo abrir automáticamente el archivo {ruta_archivo}: {e}")
+        return False
 
 
 def manejar_signal(signum, frame):
