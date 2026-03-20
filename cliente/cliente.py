@@ -156,30 +156,18 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
     )
     banner.pack(fill=tk.X, pady=(0, 12))
 
-    altura_mensaje = 300 if archivo_nombre else 380
-
     # Frame externo para el mensaje con borde sutil
     mensaje_outer_frame = tk.Frame(main_frame, bg=COLOR_BORDE)
     mensaje_outer_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 12))
-    mensaje_outer_frame.pack_propagate(False)
-    mensaje_outer_frame.configure(height=altura_mensaje)
 
     # Frame interno del mensaje con diseño limpio
     mensaje_frame = tk.Frame(mensaje_outer_frame, bg=COLOR_BLANCO)
     mensaje_frame.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
 
-    # Canvas con scrollbar para mensajes largos
-    canvas = tk.Canvas(mensaje_frame, bg=COLOR_BLANCO, highlightthickness=0)
-    scrollbar = tk.Scrollbar(mensaje_frame, orient="vertical", command=canvas.yview)
-
-    # Frame para el contenido del mensaje dentro del canvas
-    contenido_frame = tk.Frame(canvas, bg=COLOR_BLANCO)
-
-    # Configurar canvas ANTES de crear la ventana
-    canvas.configure(yscrollcommand=scrollbar.set)
-
+    # El widget Text vive directamente en el contenedor principal.
+    # El desplazamiento vertical lo maneja solo el scrollbar externo.
     mensaje_text = tk.Text(
-        contenido_frame,
+        mensaje_frame,
         font=font.Font(family="Segoe UI", size=14),
         fg=COLOR_TEXTO,
         bg=COLOR_BLANCO,
@@ -190,6 +178,7 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
         width=70,
         relief=tk.FLAT,
         borderwidth=0,
+        height=10,
     )
     mensaje_text.pack(fill=tk.BOTH, expand=True)
 
@@ -228,8 +217,10 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
                 procesar_linea_con_negritas(linea + "\n")
 
         mensaje_text.config(state="disabled")
-    # Actualizar el tamaño del frame contenedor
-    contenido_frame.update_idletasks()
+
+        # Ajustar la altura del Text al contenido para usar solo el scroll externo.
+        lineas_visibles = int(mensaje_text.count("1.0", "end", "displaylines")[0])
+        mensaje_text.configure(height=max(10, lineas_visibles))
 
     def procesar_linea_con_negritas(linea):
         """
@@ -267,36 +258,6 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
 
     # Mostrar el mensaje con formato Markdown
     mostrar_markdown(mensaje)
-
-    contenido_frame.update_idletasks()
-    contenido_width = contenido_frame.winfo_reqwidth()
-    contenido_height = contenido_frame.winfo_reqheight()
-
-    canvas_window = canvas.create_window(
-        (0, 0), window=contenido_frame, anchor="nw", width=contenido_width
-    )
-
-    canvas.update_idletasks()
-    canvas.configure(scrollregion=canvas.bbox("all"))
-
-    def actualizar_canvas_window(event=None):
-        """Actualizar ancho cuando el canvas se redimensiona"""
-        if event:
-            canvas.itemconfig(canvas_window, width=event.width - 2)
-
-    canvas.bind("<Configure>", actualizar_canvas_window)
-
-    def on_mousewheel_mensaje(event):
-        if contenido_height > canvas.winfo_height():
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-            return "break"
-
-    canvas.focus_set()
-    canvas.bind("<MouseWheel>", on_mousewheel_mensaje)
-
-    # Empaquetar canvas y scrollbar
-    canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
     # Separador
     separator = tk.Frame(main_frame, height=1, bg=COLOR_BORDE)
