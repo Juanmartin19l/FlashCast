@@ -156,16 +156,16 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
     )
     banner.pack(fill=tk.X, pady=(0, 12))
 
-    # Frame externo para el mensaje con borde sutil
-    mensaje_outer_frame = tk.Frame(main_frame, bg=COLOR_BORDE)
-    mensaje_outer_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 12))
+    # Contenedor visual del mensaje dentro del contenedor principal.
+    mensaje_frame = tk.Frame(
+        main_frame,
+        bg=COLOR_BLANCO,
+        highlightbackground=COLOR_BORDE,
+        highlightthickness=1,
+    )
+    mensaje_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 12))
 
-    # Frame interno del mensaje con diseño limpio
-    mensaje_frame = tk.Frame(mensaje_outer_frame, bg=COLOR_BLANCO)
-    mensaje_frame.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
-
-    # El widget Text vive directamente en el contenedor principal.
-    # El desplazamiento vertical lo maneja solo el scrollbar externo.
+    # El widget Text no maneja scroll propio; toda la rueda va al contenedor externo.
     mensaje_text = tk.Text(
         mensaje_frame,
         font=font.Font(family="Segoe UI", size=14),
@@ -179,8 +179,16 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
         relief=tk.FLAT,
         borderwidth=0,
         height=10,
+        takefocus=0,
+        cursor="arrow",
     )
     mensaje_text.pack(fill=tk.BOTH, expand=True)
+
+    def on_text_mousewheel(event):
+        on_outer_mousewheel(event)
+        return "break"
+
+    mensaje_text.bind("<MouseWheel>", on_text_mousewheel)
 
     # Configurar tags para formato
     mensaje_text.tag_config(
