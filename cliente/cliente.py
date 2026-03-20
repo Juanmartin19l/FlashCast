@@ -156,113 +156,54 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
     )
     banner.pack(fill=tk.X, pady=(0, 12))
 
-    # Contenedor visual del mensaje dentro del contenedor principal.
-    mensaje_frame = tk.Frame(
-        main_frame,
-        bg=COLOR_BLANCO,
-        highlightbackground=COLOR_BORDE,
-        highlightthickness=1,
-    )
-    mensaje_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 12))
+    def normalizar_linea(linea):
+        return linea.replace("**", "")
 
-    # El widget Text no maneja scroll propio; toda la rueda va al contenedor externo.
-    mensaje_text = tk.Text(
-        mensaje_frame,
-        font=font.Font(family="Segoe UI", size=14),
-        fg=COLOR_TEXTO,
-        bg=COLOR_BLANCO,
-        wrap=tk.WORD,
-        padx=24,
-        pady=24,
-        state="disabled",
-        width=70,
-        relief=tk.FLAT,
-        borderwidth=0,
-        height=10,
-        takefocus=0,
-        cursor="arrow",
-    )
-    mensaje_text.pack(fill=tk.BOTH, expand=True)
+    def crear_bloque_mensaje(texto, estilo_fuente, color_texto, pady=(0, 8)):
+        tk.Label(
+            main_frame,
+            text=texto,
+            font=estilo_fuente,
+            fg=color_texto,
+            bg=COLOR_FONDO,
+            anchor="w",
+            justify=tk.LEFT,
+            wraplength=620,
+        ).pack(fill=tk.X, pady=pady)
 
-    def on_text_mousewheel(event):
-        on_outer_mousewheel(event)
-        return "break"
-
-    mensaje_text.bind("<MouseWheel>", on_text_mousewheel)
-
-    # Configurar tags para formato
-    mensaje_text.tag_config(
-        "h1",
-        font=font.Font(family="Segoe UI", size=22, weight="bold"),
-        spacing3=12,
-        foreground="#111827",
-    )
-    mensaje_text.tag_config(
-        "h2",
-        font=font.Font(family="Segoe UI", size=18, weight="bold"),
-        spacing3=10,
-        foreground="#1f2937",
-    )
-    mensaje_text.tag_config(
-        "bold", font=font.Font(family="Segoe UI", size=14, weight="bold")
-    )
-
-    # Función para procesar y mostrar markdown simplificado
     def mostrar_markdown(texto):
-        mensaje_text.config(state="normal")
-        mensaje_text.delete("1.0", tk.END)
-
         lineas = texto.split("\n")
         for linea in lineas:
-            # Encabezados H1
-            if linea.startswith("# "):
-                mensaje_text.insert(tk.END, linea[2:] + "\n", "h1")
-            # Encabezados H2
+            linea_limpia = normalizar_linea(linea)
+
+            if not linea_limpia.strip():
+                tk.Frame(main_frame, height=8, bg=COLOR_FONDO).pack(fill=tk.X)
+            elif linea.startswith("# "):
+                crear_bloque_mensaje(
+                    linea_limpia[2:],
+                    font.Font(family="Segoe UI", size=22, weight="bold"),
+                    "#111827",
+                    pady=(0, 12),
+                )
             elif linea.startswith("## "):
-                mensaje_text.insert(tk.END, linea[3:] + "\n", "h2")
-            # Línea normal con negritas
+                crear_bloque_mensaje(
+                    linea_limpia[3:],
+                    font.Font(family="Segoe UI", size=18, weight="bold"),
+                    "#1f2937",
+                    pady=(0, 10),
+                )
+            elif "**" in linea:
+                crear_bloque_mensaje(
+                    linea_limpia,
+                    font.Font(family="Segoe UI", size=14, weight="bold"),
+                    COLOR_TEXTO,
+                )
             else:
-                procesar_linea_con_negritas(linea + "\n")
-
-        mensaje_text.config(state="disabled")
-
-        # Ajustar la altura del Text al contenido para usar solo el scroll externo.
-        lineas_visibles = int(mensaje_text.count("1.0", "end", "displaylines")[0])
-        mensaje_text.configure(height=max(10, lineas_visibles))
-
-    def procesar_linea_con_negritas(linea):
-        """
-        Procesar **negritas** de forma simple y robusta.
-        Solo busca ** ** sin otros formatos.
-        """
-        pos = 0
-
-        while pos < len(linea):
-            # Buscar el próximo **
-            inicio_bold = linea.find("**", pos)
-
-            if inicio_bold == -1:
-                # No hay más negritas, insertar el resto
-                if pos < len(linea):
-                    mensaje_text.insert(tk.END, linea[pos:])
-                break
-
-            # Insertar texto antes de **
-            if inicio_bold > pos:
-                mensaje_text.insert(tk.END, linea[pos:inicio_bold])
-
-            # Buscar el cierre de **
-            fin_bold = linea.find("**", inicio_bold + 2)
-
-            if fin_bold == -1:
-                # No hay cierre, insertar ** como texto literal y el resto
-                mensaje_text.insert(tk.END, linea[inicio_bold:])
-                break
-            else:
-                # Extraer contenido entre **
-                contenido_bold = linea[inicio_bold + 2 : fin_bold]
-                mensaje_text.insert(tk.END, contenido_bold, "bold")
-                pos = fin_bold + 2
+                crear_bloque_mensaje(
+                    linea_limpia,
+                    font.Font(family="Segoe UI", size=14),
+                    COLOR_TEXTO,
+                )
 
     # Mostrar el mensaje con formato Markdown
     mostrar_markdown(mensaje)
