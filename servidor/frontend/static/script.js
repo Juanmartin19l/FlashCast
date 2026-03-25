@@ -3,9 +3,9 @@ const btnEnviar = document.getElementById('btnEnviar');
 const btnCancelar = document.getElementById('btnCancelar');
 const btnEditar = document.getElementById('btnEditar');
 const mensaje = document.getElementById('mensaje');
-const logContainer = document.getElementById('log');
-const contadorEl = document.getElementById('contador');
-const historialEl = document.getElementById('historial');
+// const logContainer = document.getElementById('log');
+// const contadorEl = document.getElementById('contador');
+// const historialEl = document.getElementById('historial');
 const archivoInput = document.getElementById('archivo');
 const archivoNombre = document.getElementById('archivo-nombre');
 const adjuntarLabel = document.querySelector('.adjuntar-label');
@@ -114,51 +114,7 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-// Conectar a Server-Sent Events para actualizaciones en tiempo real
-function conectarStream() {
-  eventSource = new EventSource('/api/stream');
-
-  eventSource.onmessage = function (event) {
-    const data = JSON.parse(event.data);
-
-    if (data.heartbeat) {
-      return; // Ignorar heartbeats
-    }
-
-    // Procesar estadísticas
-    if (data.type === 'estadisticas') {
-      contadorEl.textContent = data.contador;
-      historialEl.textContent = data.historial_total;
-
-      if (data.enviando) {
-        btnEnviar.disabled = true;
-        btnEnviar.textContent = 'Enviando...';
-        btnCancelar.style.display = 'block';
-        btnCancelar.disabled = false;
-        btnCancelar.textContent = 'Cancelar envío';
-      } else {
-        btnEnviar.disabled = false;
-        btnEnviar.textContent = 'Enviar a toda la red';
-        btnCancelar.style.display = 'none';
-      }
-      return;
-    }
-
-    // Procesar logs
-    const logEntry = document.createElement('div');
-    logEntry.className = `log-entry ${data.tipo}`;
-    logEntry.textContent = data.texto;
-    logContainer.appendChild(logEntry);
-
-    // Auto-scroll al final
-    logContainer.scrollTop = logContainer.scrollHeight;
-  };
-
-  eventSource.onerror = function () {
-    console.error('Error en la conexión SSE. Reconectando...');
-    setTimeout(conectarStream, 3000);
-  };
-}
+// SSE y log eliminados
 
 // Enviar mensaje
 btnEnviar.addEventListener('click', function () {
@@ -251,7 +207,7 @@ btnCancelar.addEventListener('click', async function () {
 });
 
 // Inicializar
-conectarStream();
+// conectarStream(); // Eliminado
 
 // Focus en el textarea al cargar
 mensaje.focus();

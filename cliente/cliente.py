@@ -100,11 +100,11 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
     root.attributes("-topmost", True)
     root.configure(bg=COLOR_FONDO)
 
-    # Centrar ventana
-    ancho_ventana = 720
+    # Centrar ventana (más grande)
+    ancho_ventana = 900  # antes 720
     ancho_pantalla = root.winfo_screenwidth()
     alto_pantalla = root.winfo_screenheight()
-    alto_ventana = min(600, max(420, alto_pantalla - 80))
+    alto_ventana = min(800, max(600, alto_pantalla - 80))  # antes min(600, max(420, ...))
     x = (ancho_pantalla - ancho_ventana) // 2
     y = (alto_pantalla - alto_ventana) // 2
 

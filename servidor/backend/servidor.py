@@ -64,7 +64,7 @@ def allowed_file(filename):
     return bool(filename and secure_filename(filename))
 
 
-def enviar_a_ip(ip, mensaje):
+def enviar_a_ip(ip, mensaje, errores):
     global contador_enviados, cancelar_envio
 
     if cancelar_envio:
@@ -78,19 +78,14 @@ def enviar_a_ip(ip, mensaje):
 
             with lock:
                 contador_enviados += 1
-                agregar_log(f"✅ {ip}", "nueva")
-
             return True
-    except socket.timeout:
-        agregar_log(f"⏱️ {ip} - timeout", "error")
-    except ConnectionRefusedError:
-        agregar_log(f"🚫 {ip} - cliente no ejecutándose", "error")
-    except OSError as e:
-        agregar_log(f"❌ {ip} - {e}", "error")
-    return False
+    except Exception:
+        with lock:
+            errores.append(ip)
+        return False
 
 
-def iniciar_bombardeo(mensaje):
+def iniciar_bombardeo(mensaje, resultado):
     global contador_enviados, enviando, cancelar_envio, maquinas_cache
 
     enviando = True
@@ -99,12 +94,8 @@ def iniciar_bombardeo(mensaje):
     with lock:
         contador_enviados = 0
 
-    agregar_log("🚀 Iniciando envío masivo...", "info")
-
-    # Recargar machines.json (actualizado manualmente por discovery_service)
     maquinas_cache = cargar_maquinas()
 
-    # Extraer IPs del JSON
     ips = []
     for hostname, data in maquinas_cache.items():
         if isinstance(data, dict) and "ip" in data:
@@ -115,24 +106,23 @@ def iniciar_bombardeo(mensaje):
             if data not in ips:
                 ips.append(data)
 
+    errores = []
+
     if not ips:
-        agregar_log("⚠️ No hay máquinas en machines.json", "error")
-        agregar_log(
-            "💡 Ejecuta discovery_service.py en tu máquina local para agregar máquinas",
-            "info",
-        )
+        resultado["error"] = "No hay máquinas en machines.json"
         enviando = False
         return
 
-    agregar_log(f"📤 Enviando a {len(ips)} máquinas...", "info")
-
     with ThreadPoolExecutor(max_workers=MAX_HILOS) as executor:
-        list(executor.map(lambda ip: enviar_a_ip(ip, mensaje), ips))
+        list(executor.map(lambda ip: enviar_a_ip(ip, mensaje, errores), ips))
 
     if cancelar_envio:
-        agregar_log("🛑 Envío cancelado", "error")
+        resultado["error"] = "Envío cancelado"
+    elif errores:
+        resultado["error"] = f"{len(errores)} clientes tuvieron error"
     else:
-        agregar_log(f"🏁 Finalizado. {contador_enviados} mensajes enviados", "success")
+        resultado["success"] = True
+        resultado["message"] = "Mensaje enviado exitosamente"
 
     enviando = False
 
@@ -157,7 +147,6 @@ def enviar_mensaje():
     if not mensaje:
         return jsonify({"error": "Debes escribir un mensaje"}), 400
 
-    # Validar longitud del mensaje en bytes (UTF-8)
     mensaje_bytes = len(mensaje.encode("utf-8"))
     if mensaje_bytes > MAX_CARACTERES:
         return (
@@ -169,13 +158,17 @@ def enviar_mensaje():
             400,
         )
 
-    # Siempre enviar JSON a los clientes (aunque no haya archivo)
     mensaje_envio = json.dumps({"mensaje": mensaje, "archivo": archivo} if archivo else {"mensaje": mensaje}, ensure_ascii=False)
     print(f"[DEBUG] Enviando a clientes: {mensaje_envio}")
 
-    # Ejecutar en hilo separado
-    threading.Thread(target=iniciar_bombardeo, args=(mensaje_envio,), daemon=True).start()
-    return jsonify({"success": True, "message": "Envío iniciado"})
+    resultado = {}
+    thread = threading.Thread(target=iniciar_bombardeo, args=(mensaje_envio, resultado), daemon=True)
+    thread.start()
+    thread.join()  # Esperar a que termine para responder con el resultado
+
+    if "error" in resultado:
+        return jsonify({"error": resultado["error"]}), 400
+    return jsonify({"success": True, "message": resultado.get("message", "Mensaje enviado exitosamente")})
 
 
 @app.route("/api/cancelar", methods=["POST"])
