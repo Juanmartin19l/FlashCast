@@ -29,16 +29,24 @@
         </div>
         <textarea id="mensaje" placeholder="Escribe aquí el mensaje que deseas enviar a todos los equipos..."># Notificación Importante
 
-## Mensaje de la gerencia
+      ## Mensaje de la gerencia
 
-Esto es un mensaje de **ejemplo** con **negritas**.
+      Esto es un mensaje de **ejemplo** con **negritas**.
 
-El sistema soporta:
-- # para encabezados principales
-- ## para encabezados secundarios
-- ** ** para **texto en negrita**
+      El sistema soporta:
+      - # para encabezados principales
+      - ## para encabezados secundarios
+      - ** ** para **texto en negrita**
 
-Personaliza este mensaje según tus necesidades.</textarea>
+      Personaliza este mensaje según tus necesidades.</textarea>
+
+        <div class="adjuntar-section">
+          <label for="archivo" class="adjuntar-label">
+            <span class="icon-clip">📎</span> Adjuntar archivo
+            <span id="archivo-nombre" class="archivo-nombre">Ningún archivo seleccionado</span>
+          </label>
+          <input type="file" id="archivo" name="archivo" style="display:none;">
+        </div>
 
         <div class="btn-group">
           <button id="btnEnviar" class="btn-enviar">
@@ -51,22 +59,7 @@ Personaliza este mensaje según tus necesidades.</textarea>
         </div>
       </div>
 
-      <div class="log-section">
-        <div class="log-header">
-          <h2>Log de actividad</h2>
-          <div class="log-stats">
-            <div class="mini-stat">
-              <span class="mini-label">Enviados</span>
-              <span id="contador" class="mini-value">0</span>
-            </div>
-            <div class="mini-stat">
-              <span class="mini-label">Historial</span>
-              <span id="historial" class="mini-value">0</span>
-            </div>
-          </div>
-        </div>
-        <div id="log" class="log-container"></div>
-      </div>
+      <!-- Log de actividad eliminado -->
     </div>
   </div>
 
