@@ -2,6 +2,7 @@ import socket
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
+from datetime import datetime
 from flask import Flask, render_template, request, jsonify, Response, send_from_directory
 import threading
 import queue
@@ -60,15 +61,66 @@ def agregar_log(texto, tipo="info"):
     log_queue.put({"texto": texto, "tipo": tipo, "timestamp": time.time()})
 
 
+def log_event(evento, **kwargs):
+    """Log estructurado para stdout (visible en docker logs)."""
+    payload = {
+        "evento": evento,
+        "timestamp": datetime.utcnow().isoformat(timespec="milliseconds") + "Z",
+    }
+    payload.update(kwargs)
+    print(f"[{evento}] {json.dumps(payload, ensure_ascii=False)}")
+
+
 def allowed_file(filename):
     return bool(filename and secure_filename(filename))
 
 
-def enviar_a_ip(ip, mensaje, errores):
+def construir_targets(maquinas):
+    """
+    Construye una lista de destinos únicos por IP.
+    Cada destino conserva uno o más hostnames asociados.
+    """
+    targets_by_ip = {}
+
+    for hostname, data in maquinas.items():
+        ip = None
+        if isinstance(data, dict):
+            ip = data.get("ip")
+        elif isinstance(data, str):
+            ip = data
+
+        if not ip:
+            continue
+
+        ip = str(ip).strip()
+        if not ip:
+            continue
+
+        if ip not in targets_by_ip:
+            targets_by_ip[ip] = {"ip": ip, "hostnames": []}
+
+        if hostname not in targets_by_ip[ip]["hostnames"]:
+            targets_by_ip[ip]["hostnames"].append(hostname)
+
+    return list(targets_by_ip.values())
+
+
+def enviar_a_ip(target, mensaje, request_id):
     global contador_enviados, cancelar_envio
 
+    ip = target["ip"]
+    hostnames = target["hostnames"]
+    inicio = time.perf_counter()
+
     if cancelar_envio:
-        return False
+        return {
+            "ok": False,
+            "ip": ip,
+            "hostnames": hostnames,
+            "estado": "cancelado",
+            "duracion_ms": 0,
+            "error": "Cancelado antes del intento",
+        }
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -76,18 +128,48 @@ def enviar_a_ip(ip, mensaje, errores):
             s.connect((str(ip), PUERTO))
             s.sendall(mensaje.encode("utf-8"))
 
+            duracion_ms = round((time.perf_counter() - inicio) * 1000, 2)
             with lock:
                 contador_enviados += 1
-            return True
-    except Exception:
-        with lock:
-            errores.append(ip)
-        return False
+            log_event(
+                "SEND_OK",
+                request_id=request_id,
+                ip=ip,
+                hostnames=hostnames,
+                puerto=PUERTO,
+                duracion_ms=duracion_ms,
+                bytes_enviados=len(mensaje.encode("utf-8")),
+            )
+            return {
+                "ok": True,
+                "ip": ip,
+                "hostnames": hostnames,
+                "duracion_ms": duracion_ms,
+            }
+    except Exception as e:
+        duracion_ms = round((time.perf_counter() - inicio) * 1000, 2)
+        log_event(
+            "SEND_ERROR",
+            request_id=request_id,
+            ip=ip,
+            hostnames=hostnames,
+            puerto=PUERTO,
+            duracion_ms=duracion_ms,
+            error=str(e),
+        )
+        return {
+            "ok": False,
+            "ip": ip,
+            "hostnames": hostnames,
+            "duracion_ms": duracion_ms,
+            "error": str(e),
+        }
 
 
-def iniciar_bombardeo(mensaje, resultado):
+def iniciar_bombardeo(mensaje, resultado, request_id):
     global contador_enviados, enviando, cancelar_envio, maquinas_cache
 
+    inicio_envio = time.perf_counter()
     enviando = True
     cancelar_envio = False
 
@@ -95,34 +177,51 @@ def iniciar_bombardeo(mensaje, resultado):
         contador_enviados = 0
 
     maquinas_cache = cargar_maquinas()
+    targets = construir_targets(maquinas_cache)
 
-    ips = []
-    for hostname, data in maquinas_cache.items():
-        if isinstance(data, dict) and "ip" in data:
-            ip = data["ip"]
-            if ip not in ips:
-                ips.append(ip)
-        elif isinstance(data, str):
-            if data not in ips:
-                ips.append(data)
-
-    errores = []
-
-    if not ips:
+    if not targets:
         resultado["error"] = "No hay máquinas en machines.json"
         enviando = False
         return
 
+    log_event(
+        "SEND_START",
+        request_id=request_id,
+        total_destinos=len(targets),
+        timeout_segundos=TIMEOUT,
+        puerto_destino=PUERTO,
+    )
+
+    resultados = []
     with ThreadPoolExecutor(max_workers=MAX_HILOS) as executor:
-        list(executor.map(lambda ip: enviar_a_ip(ip, mensaje, errores), ips))
+        resultados = list(
+            executor.map(lambda target: enviar_a_ip(target, mensaje, request_id), targets)
+        )
+
+    errores = [r for r in resultados if not r["ok"]]
+    exitos = [r for r in resultados if r["ok"]]
+    duracion_total_ms = round((time.perf_counter() - inicio_envio) * 1000, 2)
 
     if cancelar_envio:
         resultado["error"] = "Envío cancelado"
     elif errores:
-        resultado["error"] = f"{len(errores)} clientes tuvieron error"
+        resultado["error"] = (
+            f"{len(errores)} clientes tuvieron error y {len(exitos)} recibieron OK"
+        )
     else:
         resultado["success"] = True
         resultado["message"] = "Mensaje enviado exitosamente"
+
+    resultado["detalles"] = resultados
+    log_event(
+        "SEND_SUMMARY",
+        request_id=request_id,
+        total=len(resultados),
+        exitos=len(exitos),
+        errores=len(errores),
+        cancelado=cancelar_envio,
+        duracion_total_ms=duracion_total_ms,
+    )
 
     enviando = False
 
@@ -142,7 +241,14 @@ def enviar_mensaje():
     data = request.json
     mensaje = data.get("mensaje", "").strip()
     archivo = data.get("archivo")
-    print(f"[DEBUG] /api/enviar recibido: mensaje='{mensaje}', archivo='{archivo}'")
+    request_id = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+    log_event(
+        "SEND_REQUEST",
+        request_id=request_id,
+        client_ip=request.remote_addr,
+        archivo=archivo,
+        mensaje_bytes=len(mensaje.encode("utf-8")),
+    )
 
     if not mensaje:
         return jsonify({"error": "Debes escribir un mensaje"}), 400
@@ -159,16 +265,36 @@ def enviar_mensaje():
         )
 
     mensaje_envio = json.dumps({"mensaje": mensaje, "archivo": archivo} if archivo else {"mensaje": mensaje}, ensure_ascii=False)
-    print(f"[DEBUG] Enviando a clientes: {mensaje_envio}")
+    log_event("SEND_PAYLOAD_READY", request_id=request_id, mensaje_preview=mensaje[:120])
 
     resultado = {}
-    thread = threading.Thread(target=iniciar_bombardeo, args=(mensaje_envio, resultado), daemon=True)
+    thread = threading.Thread(
+        target=iniciar_bombardeo,
+        args=(mensaje_envio, resultado, request_id),
+        daemon=True,
+    )
     thread.start()
     thread.join()  # Esperar a que termine para responder con el resultado
 
     if "error" in resultado:
-        return jsonify({"error": resultado["error"]}), 400
-    return jsonify({"success": True, "message": resultado.get("message", "Mensaje enviado exitosamente")})
+        return (
+            jsonify(
+                {
+                    "error": resultado["error"],
+                    "request_id": request_id,
+                    "detalles": resultado.get("detalles", []),
+                }
+            ),
+            400,
+        )
+    return jsonify(
+        {
+            "success": True,
+            "message": resultado.get("message", "Mensaje enviado exitosamente"),
+            "request_id": request_id,
+            "detalles": resultado.get("detalles", []),
+        }
+    )
 
 
 @app.route("/api/cancelar", methods=["POST"])
