@@ -171,9 +171,6 @@ function enviarMensaje(mensaje, archivoNombre = null) {
       if (data.success) {
         mostrarNotificacion('Mensaje enviado correctamente', 'success');
         limpiarFormularioEnvio();
-        setTimeout(() => {
-          window.location.reload();
-        }, 800);
       } else {
         mostrarNotificacion('Error: ' + (data.error || data.message), 'error');
       }
