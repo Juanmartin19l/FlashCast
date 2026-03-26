@@ -27,10 +27,6 @@
           <h2>Mensaje a enviar</h2>
           <p class="section-subtitle">Redacta el mensaje, selecciona el destino y envíalo en segundos.</p>
         </div>
-        <div class="composer-meta">
-          <span class="meta-chip" id="chipDestino">Destino: Toda la red</span>
-          <span class="meta-chip secondary"><span id="contadorCaracteres">0</span>/2048 bytes</span>
-        </div>
         <textarea id="mensaje" placeholder="Ejemplo:
 # Notificación importante
 Recordatorio de reunión a las 10:30 en sala principal."></textarea>
@@ -48,6 +44,8 @@ Recordatorio de reunión a las 10:30 en sala principal."></textarea>
             <span class="icon-clip">📎</span> Adjuntar archivo
             <span id="archivo-nombre" class="archivo-nombre">Ningún archivo seleccionado</span>
           </label>
+          <button id="btnQuitarArchivo" type="button" class="btn-quitar-archivo" style="display: none;">Quitar
+            archivo</button>
           <input type="file" id="archivo" name="archivo" style="display:none;">
         </div>
 

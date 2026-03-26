@@ -164,29 +164,6 @@ h2 {
   color: var(--text-secondary);
 }
 
-.composer-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-
-.meta-chip {
-  font-size: 0.78rem;
-  color: #b6f0ff;
-  background: rgba(14, 165, 233, 0.12);
-  border: 1px solid rgba(14, 165, 233, 0.35);
-  border-radius: 999px;
-  padding: 6px 10px;
-}
-
-.meta-chip.secondary {
-  color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.04);
-  border-color: var(--border-color);
-}
-
 #mensaje {
   flex: 1;
   width: 100%;
@@ -576,18 +553,20 @@ h2 {
   margin: 18px 0 10px 0;
   display: flex;
   align-items: center;
+  gap: 10px;
 }
 
 .adjuntar-label {
   display: flex;
   align-items: center;
+  width: 100%;
   background: var(--bg-tertiary);
   color: var(--accent-primary);
   border: 1.5px dashed var(--accent-primary);
   border-radius: var(--radius-md);
-  padding: 10px 18px;
+  padding: 12px 14px;
   font-weight: 500;
-  font-size: 1rem;
+  font-size: 0.95rem;
   cursor: pointer;
   transition:
     background 0.2s,
@@ -603,13 +582,41 @@ h2 {
   margin-right: 6px;
 }
 .archivo-nombre {
-  margin-left: 18px;
+  margin-left: auto;
   color: var(--text-muted);
   font-size: 0.97em;
   font-style: italic;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 220px;
+  max-width: 55%;
   display: inline-block;
+}
+
+.btn-quitar-archivo {
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition);
+}
+
+.btn-quitar-archivo:hover {
+  border-color: var(--accent-danger);
+  color: #ffd1d1;
+}
+
+@media (max-width: 768px) {
+  .adjuntar-section {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .archivo-nombre {
+    max-width: 58%;
+  }
 }

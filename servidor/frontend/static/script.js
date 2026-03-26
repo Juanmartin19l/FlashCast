@@ -3,35 +3,16 @@ const btnEnviar = document.getElementById('btnEnviar');
 const btnCancelar = document.getElementById('btnCancelar');
 const mensaje = document.getElementById('mensaje');
 const departamentoInput = document.getElementById('departamento');
-const chipDestino = document.getElementById('chipDestino');
-const contadorCaracteres = document.getElementById('contadorCaracteres');
 // const logContainer = document.getElementById('log');
 // const contadorEl = document.getElementById('contador');
 // const historialEl = document.getElementById('historial');
 const archivoInput = document.getElementById('archivo');
 const archivoNombre = document.getElementById('archivo-nombre');
+const btnQuitarArchivo = document.getElementById('btnQuitarArchivo');
 const MAX_BYTES = 2048;
 
 function contarBytes(texto) {
   return new TextEncoder().encode(texto).length;
-}
-
-function actualizarContador() {
-  const bytes = contarBytes(mensaje.value);
-  contadorCaracteres.textContent = bytes;
-
-  if (bytes > MAX_BYTES) {
-    contadorCaracteres.style.color = 'var(--accent-danger)';
-  } else {
-    contadorCaracteres.style.color = 'inherit';
-  }
-}
-
-function actualizarDestino() {
-  const destino = departamentoInput.value;
-  chipDestino.textContent = destino
-    ? `Destino: ${destino}`
-    : 'Destino: Toda la red';
 }
 
 function setSendingState(isSending) {
@@ -62,8 +43,6 @@ function cargarDepartamentos() {
         option.textContent = departamento;
         departamentoInput.appendChild(option);
       }
-
-      actualizarDestino();
     })
     .catch((err) => {
       mostrarNotificacion(
@@ -78,8 +57,7 @@ function limpiarFormularioEnvio() {
   departamentoInput.value = '';
   archivoInput.value = '';
   archivoNombre.textContent = 'Ningún archivo seleccionado';
-  actualizarContador();
-  actualizarDestino();
+  btnQuitarArchivo.style.display = 'none';
   mensaje.focus();
 }
 
@@ -216,17 +194,20 @@ btnCancelar.addEventListener('click', async function () {
 // Focus en el textarea al cargar
 mensaje.focus();
 cargarDepartamentos();
-actualizarContador();
-actualizarDestino();
-
-mensaje.addEventListener('input', actualizarContador);
-departamentoInput.addEventListener('change', actualizarDestino);
 
 // Actualizar el nombre del archivo seleccionado
 archivoInput.addEventListener('change', function () {
   if (archivoInput.files.length > 0) {
     archivoNombre.textContent = archivoInput.files[0].name;
+    btnQuitarArchivo.style.display = 'inline-flex';
   } else {
     archivoNombre.textContent = 'Ningún archivo seleccionado';
+    btnQuitarArchivo.style.display = 'none';
   }
+});
+
+btnQuitarArchivo.addEventListener('click', function () {
+  archivoInput.value = '';
+  archivoNombre.textContent = 'Ningún archivo seleccionado';
+  btnQuitarArchivo.style.display = 'none';
 });
