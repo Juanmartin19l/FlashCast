@@ -186,8 +186,13 @@ def cargar_dispositivos():
     return cached_devices
 
 
-def construir_targets(dispositivos):
+def normalizar_texto(valor):
+    return str(valor or "").strip().lower()
+
+
+def construir_targets(dispositivos, departamento_objetivo=None):
     targets_by_ip = {}
+    depto_buscado = normalizar_texto(departamento_objetivo)
 
     for dispositivo in dispositivos:
         if not isinstance(dispositivo, dict):
@@ -195,7 +200,11 @@ def construir_targets(dispositivos):
 
         ip = str(dispositivo.get("ip", "")).strip()
         nombre = str(dispositivo.get("nombre", "")).strip()
+        departamento = normalizar_texto(dispositivo.get("departamento"))
         if not ip or not nombre:
+            continue
+
+        if depto_buscado and departamento != depto_buscado:
             continue
 
         if ip not in targets_by_ip:
@@ -264,7 +273,7 @@ def enviar_a_ip(target, mensaje, request_id):
         }
 
 
-def ejecutar_envio(mensaje, resultado, request_id):
+def ejecutar_envio(mensaje, resultado, request_id, departamento_objetivo=None):
     global sent_counter, send_in_progress, send_cancel_requested
 
     send_in_progress = True
@@ -279,9 +288,17 @@ def ejecutar_envio(mensaje, resultado, request_id):
         send_in_progress = False
         return
 
-    targets = construir_targets(dispositivos)
+    targets = construir_targets(
+        dispositivos=dispositivos,
+        departamento_objetivo=departamento_objetivo,
+    )
     if not targets:
-        resultado["error"] = "No hay dispositivos en NocoDB"
+        if departamento_objetivo:
+            resultado["error"] = (
+                f"No hay dispositivos en el departamento '{departamento_objetivo}'"
+            )
+        else:
+            resultado["error"] = "No hay dispositivos en NocoDB"
         send_in_progress = False
         return
 
@@ -322,6 +339,7 @@ def enviar_mensaje():
     data = request.json or {}
     mensaje = str(data.get("mensaje", "")).strip()
     archivo = data.get("archivo")
+    departamento = str(data.get("departamento", "")).strip()
 
     if not mensaje:
         return jsonify({"error": "Debes escribir un mensaje"}), 400
@@ -343,7 +361,12 @@ def enviar_mensaje():
 
     request_id = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
     resultado = {}
-    ejecutar_envio(json.dumps(payload, ensure_ascii=False), resultado, request_id)
+    ejecutar_envio(
+        mensaje=json.dumps(payload, ensure_ascii=False),
+        resultado=resultado,
+        request_id=request_id,
+        departamento_objetivo=departamento or None,
+    )
 
     if "error" in resultado:
         return jsonify(
@@ -355,6 +378,7 @@ def enviar_mensaje():
             "success": True,
             "message": resultado.get("message", "Mensaje enviado exitosamente"),
             "request_id": request_id,
+            "departamento": departamento or None,
             "detalles": resultado.get("detalles", []),
         }
     )
@@ -375,6 +399,20 @@ def cancelar_envio():
 def listar_dispositivos():
     try:
         return jsonify({"success": True, "data": cargar_dispositivos()})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
+@app.route("/api/departamentos", methods=["GET"])
+def listar_departamentos():
+    try:
+        dispositivos = cargar_dispositivos()
+        departamentos = {
+            str(item.get("departamento", "")).strip()
+            for item in dispositivos
+            if isinstance(item, dict) and str(item.get("departamento", "")).strip()
+        }
+        return jsonify({"success": True, "data": sorted(departamentos, key=str.lower)})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
 

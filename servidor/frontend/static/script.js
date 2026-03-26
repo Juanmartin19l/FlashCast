@@ -2,14 +2,42 @@
 const btnEnviar = document.getElementById('btnEnviar');
 const btnCancelar = document.getElementById('btnCancelar');
 const mensaje = document.getElementById('mensaje');
+const departamentoInput = document.getElementById('departamento');
 // const logContainer = document.getElementById('log');
 // const contadorEl = document.getElementById('contador');
 // const historialEl = document.getElementById('historial');
 const archivoInput = document.getElementById('archivo');
 const archivoNombre = document.getElementById('archivo-nombre');
 
+function cargarDepartamentos() {
+  fetch('/api/departamentos')
+    .then((res) => res.json())
+    .then((data) => {
+      if (!data.success || !Array.isArray(data.data)) {
+        throw new Error(
+          data.error || 'No se pudieron cargar los departamentos',
+        );
+      }
+
+      const departamentos = data.data;
+      for (const departamento of departamentos) {
+        const option = document.createElement('option');
+        option.value = departamento;
+        option.textContent = departamento;
+        departamentoInput.appendChild(option);
+      }
+    })
+    .catch((err) => {
+      mostrarNotificacion(
+        'No se pudieron cargar departamentos: ' + err,
+        'warning',
+      );
+    });
+}
+
 function limpiarFormularioEnvio() {
   mensaje.value = '';
+  departamentoInput.value = '';
   archivoInput.value = '';
   archivoNombre.textContent = 'Ningún archivo seleccionado';
   mensaje.focus();
@@ -36,6 +64,7 @@ function mostrarNotificacion(mensaje, tipo = 'info', duracion = 4000) {
 btnEnviar.addEventListener('click', function () {
   const mensajeTexto = mensaje.value.trim();
   const archivo = archivoInput.files[0];
+  const departamento = departamentoInput.value.trim();
 
   if (!mensajeTexto) {
     mostrarNotificacion('Debes escribir un mensaje', 'error');
@@ -56,7 +85,7 @@ btnEnviar.addEventListener('click', function () {
         if (data.success) {
           mostrarNotificacion('Archivo subido correctamente', 'success');
           // Enviar mensaje junto con nombre del archivo
-          enviarMensaje(mensajeTexto, data.filename);
+          enviarMensaje(mensajeTexto, data.filename, departamento);
         } else {
           mostrarNotificacion('Error al subir archivo: ' + data.error, 'error');
         }
@@ -66,14 +95,17 @@ btnEnviar.addEventListener('click', function () {
       });
   } else {
     // Solo enviar mensaje
-    enviarMensaje(mensajeTexto);
+    enviarMensaje(mensajeTexto, null, departamento);
   }
 });
 
-function enviarMensaje(mensaje, archivoNombre = null) {
+function enviarMensaje(mensaje, archivoNombre = null, departamento = '') {
   const payload = { mensaje };
   if (archivoNombre) {
     payload.archivo = archivoNombre;
+  }
+  if (departamento) {
+    payload.departamento = departamento;
   }
   fetch('/api/enviar', {
     method: 'POST',
@@ -85,7 +117,11 @@ function enviarMensaje(mensaje, archivoNombre = null) {
     .then((res) => res.json())
     .then((data) => {
       if (data.success) {
-        mostrarNotificacion('Mensaje enviado correctamente', 'success');
+        const detalle = departamento ? ` a ${departamento}` : '';
+        mostrarNotificacion(
+          'Mensaje enviado correctamente' + detalle,
+          'success',
+        );
         limpiarFormularioEnvio();
       } else {
         mostrarNotificacion('Error: ' + (data.error || data.message), 'error');
@@ -124,6 +160,7 @@ btnCancelar.addEventListener('click', async function () {
 
 // Focus en el textarea al cargar
 mensaje.focus();
+cargarDepartamentos();
 
 // Actualizar el nombre del archivo seleccionado
 archivoInput.addEventListener('change', function () {
