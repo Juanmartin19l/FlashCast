@@ -1,5 +1,8 @@
 # FlashCast - .gitignore
 
+# Environment Variables
+.env
+
 # Python
 __pycache__/
 *.py[cod]
