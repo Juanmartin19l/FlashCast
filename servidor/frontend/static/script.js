@@ -57,6 +57,7 @@ function limpiarFormularioEnvio() {
   departamentoInput.value = '';
   archivoInput.value = '';
   archivoNombre.textContent = 'Ningún archivo seleccionado';
+  archivoNombre.classList.remove('activo');
   btnQuitarArchivo.style.display = 'none';
   mensaje.focus();
 }
@@ -199,9 +200,11 @@ cargarDepartamentos();
 archivoInput.addEventListener('change', function () {
   if (archivoInput.files.length > 0) {
     archivoNombre.textContent = archivoInput.files[0].name;
+    archivoNombre.classList.add('activo');
     btnQuitarArchivo.style.display = 'inline-flex';
   } else {
     archivoNombre.textContent = 'Ningún archivo seleccionado';
+    archivoNombre.classList.remove('activo');
     btnQuitarArchivo.style.display = 'none';
   }
 });
@@ -209,5 +212,6 @@ archivoInput.addEventListener('change', function () {
 btnQuitarArchivo.addEventListener('click', function () {
   archivoInput.value = '';
   archivoNombre.textContent = 'Ningún archivo seleccionado';
+  archivoNombre.classList.remove('activo');
   btnQuitarArchivo.style.display = 'none';
 });
