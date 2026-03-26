@@ -25,19 +25,15 @@
       <div class="mensaje-section">
         <div class="section-header">
           <h2>Mensaje a enviar</h2>
+          <p class="section-subtitle">Redacta el mensaje, selecciona el destino y envíalo en segundos.</p>
         </div>
-        <textarea id="mensaje" placeholder="Escribe aquí el mensaje que deseas enviar a todos los equipos..."># Notificación Importante
-
-      ## Mensaje de la gerencia
-
-      Esto es un mensaje de **ejemplo** con **negritas**.
-
-      El sistema soporta:
-      - # para encabezados principales
-      - ## para encabezados secundarios
-      - ** ** para **texto en negrita**
-
-      Personaliza este mensaje según tus necesidades.</textarea>
+        <div class="composer-meta">
+          <span class="meta-chip" id="chipDestino">Destino: Toda la red</span>
+          <span class="meta-chip secondary"><span id="contadorCaracteres">0</span>/2048 bytes</span>
+        </div>
+        <textarea id="mensaje" placeholder="Ejemplo:
+# Notificación importante
+Recordatorio de reunión a las 10:30 en sala principal."></textarea>
 
         <div class="filtro-section">
           <label for="departamento" class="filtro-label">Departamento (opcional)</label>
@@ -57,7 +53,7 @@
 
         <div class="btn-group">
           <button id="btnEnviar" class="btn-enviar">
-            Enviar a toda la red
+            Enviar mensaje
           </button>
 
           <button id="btnCancelar" class="btn-cancelar" style="display: none;">

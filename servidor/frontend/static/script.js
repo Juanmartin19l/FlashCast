@@ -3,11 +3,47 @@ const btnEnviar = document.getElementById('btnEnviar');
 const btnCancelar = document.getElementById('btnCancelar');
 const mensaje = document.getElementById('mensaje');
 const departamentoInput = document.getElementById('departamento');
+const chipDestino = document.getElementById('chipDestino');
+const contadorCaracteres = document.getElementById('contadorCaracteres');
 // const logContainer = document.getElementById('log');
 // const contadorEl = document.getElementById('contador');
 // const historialEl = document.getElementById('historial');
 const archivoInput = document.getElementById('archivo');
 const archivoNombre = document.getElementById('archivo-nombre');
+const MAX_BYTES = 2048;
+
+function contarBytes(texto) {
+  return new TextEncoder().encode(texto).length;
+}
+
+function actualizarContador() {
+  const bytes = contarBytes(mensaje.value);
+  contadorCaracteres.textContent = bytes;
+
+  if (bytes > MAX_BYTES) {
+    contadorCaracteres.style.color = 'var(--accent-danger)';
+  } else {
+    contadorCaracteres.style.color = 'inherit';
+  }
+}
+
+function actualizarDestino() {
+  const destino = departamentoInput.value;
+  chipDestino.textContent = destino
+    ? `Destino: ${destino}`
+    : 'Destino: Toda la red';
+}
+
+function setSendingState(isSending) {
+  btnEnviar.disabled = isSending;
+  btnEnviar.textContent = isSending ? 'Enviando...' : 'Enviar mensaje';
+  btnCancelar.style.display = isSending ? 'block' : 'none';
+
+  if (!isSending) {
+    btnCancelar.disabled = false;
+    btnCancelar.textContent = 'Cancelar envío';
+  }
+}
 
 function cargarDepartamentos() {
   fetch('/api/departamentos')
@@ -26,6 +62,8 @@ function cargarDepartamentos() {
         option.textContent = departamento;
         departamentoInput.appendChild(option);
       }
+
+      actualizarDestino();
     })
     .catch((err) => {
       mostrarNotificacion(
@@ -40,6 +78,8 @@ function limpiarFormularioEnvio() {
   departamentoInput.value = '';
   archivoInput.value = '';
   archivoNombre.textContent = 'Ningún archivo seleccionado';
+  actualizarContador();
+  actualizarDestino();
   mensaje.focus();
 }
 
@@ -61,45 +101,66 @@ function mostrarNotificacion(mensaje, tipo = 'info', duracion = 4000) {
 }
 
 // Enviar mensaje
-btnEnviar.addEventListener('click', function () {
+btnEnviar.addEventListener('click', async function () {
   const mensajeTexto = mensaje.value.trim();
   const archivo = archivoInput.files[0];
   const departamento = departamentoInput.value.trim();
+  const bytes = contarBytes(mensajeTexto);
 
   if (!mensajeTexto) {
     mostrarNotificacion('Debes escribir un mensaje', 'error');
     return;
   }
 
-  if (archivo) {
-    // Subir archivo primero
-    const formData = new FormData();
-    formData.append('file', archivo);
+  if (bytes > MAX_BYTES) {
+    mostrarNotificacion(
+      `El mensaje supera el limite de ${MAX_BYTES} bytes`,
+      'error',
+    );
+    return;
+  }
 
-    fetch('/api/upload', {
-      method: 'POST',
-      body: formData,
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          mostrarNotificacion('Archivo subido correctamente', 'success');
-          // Enviar mensaje junto con nombre del archivo
-          enviarMensaje(mensajeTexto, data.filename, departamento);
-        } else {
-          mostrarNotificacion('Error al subir archivo: ' + data.error, 'error');
-        }
-      })
-      .catch((err) => {
-        mostrarNotificacion('Error al subir archivo: ' + err, 'error');
+  setSendingState(true);
+
+  if (archivo) {
+    try {
+      // Subir archivo primero
+      const formData = new FormData();
+      formData.append('file', archivo);
+
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
       });
+      const uploadData = await uploadRes.json();
+
+      if (!uploadData.success) {
+        mostrarNotificacion(
+          'Error al subir archivo: ' +
+            (uploadData.error || 'Error desconocido'),
+          'error',
+        );
+        return;
+      }
+
+      mostrarNotificacion('Archivo subido correctamente', 'success');
+      await enviarMensaje(mensajeTexto, uploadData.filename, departamento);
+    } catch (err) {
+      mostrarNotificacion('Error al subir archivo: ' + err, 'error');
+    } finally {
+      setSendingState(false);
+    }
   } else {
-    // Solo enviar mensaje
-    enviarMensaje(mensajeTexto, null, departamento);
+    try {
+      // Solo enviar mensaje
+      await enviarMensaje(mensajeTexto, null, departamento);
+    } finally {
+      setSendingState(false);
+    }
   }
 });
 
-function enviarMensaje(mensaje, archivoNombre = null, departamento = '') {
+async function enviarMensaje(mensaje, archivoNombre = null, departamento = '') {
   const payload = { mensaje };
   if (archivoNombre) {
     payload.archivo = archivoNombre;
@@ -107,29 +168,23 @@ function enviarMensaje(mensaje, archivoNombre = null, departamento = '') {
   if (departamento) {
     payload.departamento = departamento;
   }
-  fetch('/api/enviar', {
+  const res = await fetch('/api/enviar', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.success) {
-        const detalle = departamento ? ` a ${departamento}` : '';
-        mostrarNotificacion(
-          'Mensaje enviado correctamente' + detalle,
-          'success',
-        );
-        limpiarFormularioEnvio();
-      } else {
-        mostrarNotificacion('Error: ' + (data.error || data.message), 'error');
-      }
-    })
-    .catch((err) => {
-      mostrarNotificacion('Error al enviar mensaje: ' + err, 'error');
-    });
+  });
+
+  const data = await res.json();
+  if (data.success) {
+    const detalle = departamento ? ` a ${departamento}` : '';
+    mostrarNotificacion('Mensaje enviado correctamente' + detalle, 'success');
+    limpiarFormularioEnvio();
+    return;
+  }
+
+  mostrarNotificacion('Error: ' + (data.error || data.message), 'error');
 }
 
 // Cancelar envío
@@ -161,6 +216,11 @@ btnCancelar.addEventListener('click', async function () {
 // Focus en el textarea al cargar
 mensaje.focus();
 cargarDepartamentos();
+actualizarContador();
+actualizarDestino();
+
+mensaje.addEventListener('input', actualizarContador);
+departamentoInput.addEventListener('change', actualizarDestino);
 
 // Actualizar el nombre del archivo seleccionado
 archivoInput.addEventListener('change', function () {
