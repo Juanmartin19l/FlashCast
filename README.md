@@ -7,10 +7,8 @@ Sistema de mensajería distribuida para enviar notificaciones instantáneas a m�
 - 🚀 Transmisión masiva (500+ equipos simultáneamente)
 - 🌐 Interfaz web moderna
 - 📡 Monitoreo en tiempo real
-- 🔍 Descubrimiento automático de red (hostname pattern TESO-\*)
-- 💾 Persistencia de máquinas en machines.json
+- 🗂️ Gestión de dispositivos en NocoDB
 - 🛑 Control de cancelación de envíos
-- 🔄 Escaneo periódico en background (discovery service)
 
 ## 🏗️ Project Structure
 
@@ -19,15 +17,12 @@ FlashCast/
 ├── servidor/                   # Broadcast server
 │   ├── backend/
 │   │   ├── servidor.py        # Flask server + message sender
-│   │   └── discovery_service.py  # Network discovery service (runs separately)
 │   ├── frontend/              # Web interface
 │   │   ├── templates/
 │   │   │   └── index.html     # Control panel
 │   │   └── static/
 │   │       ├── script.js      # Frontend logic
 │   │       └── style.css      # Styles
-│   └── data/                  # Persistence
-│       └── machines.json      # Hostname -> IP mapping
 │
 ├── cliente/                    # Client agent
 │   ├── cliente.py             # Message receiver service
@@ -67,16 +62,15 @@ docker compose up --build
 
 Acceder a: **<http://localhost:8080>**
 
-### 3. Ejecutar Discovery Service (en tu máquina local)
+### 3. Configurar NocoDB
 
-**Importante:** Este servicio debe ejecutarse en tu máquina local (no en Docker) para escanear la red real.
+Configura `servidor/.env` con tu URL y token de NocoDB:
 
-```bash
-# En otra terminal
-python servidor/backend/discovery_service.py
-```
-
-El servicio escanea la red cada 5 minutos buscando máquinas con patrón **TESO-\*** y actualiza `machines.json`.
+- `NOCODB_BASE_URL`
+- `NOCODB_API_TOKEN`
+- `NOCODB_ORG`
+- `NOCODB_PROJECT`
+- `NOCODB_TABLE=dispositivos`
 
 ### 4. Generar Cliente (.exe)
 
@@ -89,5 +83,5 @@ El ejecutable estará en `dist/cliente.exe` - distribuir a los equipos de la red
 ## Stack Tecnológico
 
 **Servidor:** Python, Flask, Socket, ThreadPoolExecutor  
-**Frontend:** HTML5, CSS3, JavaScript ES6, SSE  
+**Frontend:** HTML5, CSS3, JavaScript ES6  
 **Cliente:** Python, Tkinter, PyInstaller

@@ -1,23 +1,12 @@
 // Elementos del DOM
 const btnEnviar = document.getElementById('btnEnviar');
 const btnCancelar = document.getElementById('btnCancelar');
-const btnEditar = document.getElementById('btnEditar');
 const mensaje = document.getElementById('mensaje');
 // const logContainer = document.getElementById('log');
 // const contadorEl = document.getElementById('contador');
 // const historialEl = document.getElementById('historial');
 const archivoInput = document.getElementById('archivo');
 const archivoNombre = document.getElementById('archivo-nombre');
-const adjuntarLabel = document.querySelector('.adjuntar-label');
-
-// Modal
-const modalEditar = document.getElementById('modalEditar');
-const jsonEditor = document.getElementById('jsonEditor');
-const btnGuardar = document.getElementById('btnGuardar');
-const btnCancelarEdicion = document.getElementById('btnCancelarEdicion');
-const btnCerrarModal = document.getElementById('btnCerrarModal');
-
-let eventSource = null;
 
 function limpiarFormularioEnvio() {
   mensaje.value = '';
@@ -42,79 +31,6 @@ function mostrarNotificacion(mensaje, tipo = 'info', duracion = 4000) {
     setTimeout(() => notificacion.remove(), 300);
   }, duracion);
 }
-
-// Manejo del Modal
-function abrirModalEdicion() {
-  fetch('/api/machines')
-    .then((res) => res.json())
-    .then((data) => {
-      jsonEditor.value = JSON.stringify(data, null, 2);
-      modalEditar.classList.add('show');
-    })
-    .catch((err) => {
-      mostrarNotificacion('Error al cargar machines.json: ' + err, 'error');
-    });
-}
-
-function cerrarModalEdicion() {
-  modalEditar.classList.remove('show');
-}
-
-function guardarMachines() {
-  try {
-    const machines = JSON.parse(jsonEditor.value);
-
-    fetch('/api/machines', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(machines),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          mostrarNotificacion('Máquinas guardadas correctamente', 'success');
-          cerrarModalEdicion();
-          // Actualizar contador sin recargar
-          fetch('/api/estadisticas')
-            .then((res) => res.json())
-            .then((stats) => {
-              historialEl.textContent = stats.historial_total;
-            });
-        } else {
-          mostrarNotificacion('Error: ' + data.error, 'error');
-        }
-      })
-      .catch((err) => {
-        mostrarNotificacion('Error al guardar: ' + err, 'error');
-      });
-  } catch (e) {
-    mostrarNotificacion('JSON inválido: ' + e.message, 'error');
-  }
-}
-
-// Event Listeners del Modal
-btnEditar.addEventListener('click', abrirModalEdicion);
-btnCerrarModal.addEventListener('click', cerrarModalEdicion);
-btnCancelarEdicion.addEventListener('click', cerrarModalEdicion);
-btnGuardar.addEventListener('click', guardarMachines);
-
-// Cerrar modal al hacer click fuera
-modalEditar.addEventListener('click', function (e) {
-  if (e.target === modalEditar) {
-    cerrarModalEdicion();
-  }
-});
-
-// Cerrar modal con ESC
-document.addEventListener('keydown', function (e) {
-  if (e.key === 'Escape') {
-    cerrarModalEdicion();
-  }
-});
-
-// SSE y log eliminados
 
 // Enviar mensaje
 btnEnviar.addEventListener('click', function () {

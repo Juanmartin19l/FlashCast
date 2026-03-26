@@ -23,7 +23,6 @@ build/
 dist/
 
 # Project Specific
-data/historial_ips.json
 logs/
 *.log
 
@@ -45,6 +44,3 @@ htmlcov/
 
 # Documentation builds
 docs/_build/
-
-# Data
-servidor/data/machines.json
