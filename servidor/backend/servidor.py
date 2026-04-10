@@ -7,7 +7,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-import requests
+import psycopg2
+import psycopg2.extras
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
 
@@ -56,120 +57,109 @@ sent_counter = 0
 cached_devices = []
 
 
-class NocoDBClient:
+class DatabaseClient:
     def __init__(self):
-        self.base_url = os.environ.get("NOCODB_BASE_URL", "").rstrip("/")
-        self.api_token = os.environ.get("NOCODB_API_TOKEN", "")
-        self.org = os.environ.get("NOCODB_ORG", "noco")
-        self.project = os.environ.get("NOCODB_PROJECT", "nc")
-        self.table = os.environ.get("NOCODB_TABLE", "dispositivos")
-        self.api_mode = os.environ.get("NOCODB_API_MODE", "auto").strip().lower()
-        self.request_timeout = int(os.environ.get("NOCODB_TIMEOUT", "10"))
+        self.host = os.environ.get("DB_HOST", "localhost")
+        self.port = int(os.environ.get("DB_PORT", "5432"))
+        self.dbname = os.environ.get("DB_NAME", "flashcast")
+        self.user = os.environ.get("DB_USER", "flashcast")
+        self.password = os.environ.get("DB_PASSWORD", "")
+        self._conn = None
 
-    def _headers(self):
-        return {"xc-token": self.api_token, "Content-Type": "application/json"}
-
-    def _v1_table_url(self):
-        return (
-            f"{self.base_url}/api/v1/db/data/v1/{self.org}/{self.project}/{self.table}"
-        )
-
-    def _v2_table_url(self):
-        return f"{self.base_url}/api/v2/tables/{self.table}/records"
+    def _get_connection(self):
+        if self._conn is None or self._conn.closed:
+            self._conn = psycopg2.connect(
+                host=self.host,
+                port=self.port,
+                dbname=self.dbname,
+                user=self.user,
+                password=self.password,
+            )
+        return self._conn
 
     def _validate_config(self):
         missing = []
-        if not self.base_url:
-            missing.append("NOCODB_BASE_URL")
-        if not self.api_token:
-            missing.append("NOCODB_API_TOKEN")
+        if not self.host:
+            missing.append("DB_HOST")
+        if not self.dbname:
+            missing.append("DB_NAME")
+        if not self.user:
+            missing.append("DB_USER")
+        if not self.password:
+            missing.append("DB_PASSWORD")
         if missing:
             raise ValueError(f"Faltan variables de entorno: {', '.join(missing)}")
 
-    def _do_request(self, base_url, method, path="", payload=None, params=None):
-        url = base_url
-        if path:
-            url = f"{url}/{path}"
-
-        response = requests.request(
-            method=method,
-            url=url,
-            headers=self._headers(),
-            json=payload,
-            params=params,
-            timeout=self.request_timeout,
-        )
-
-        try:
-            body = response.json()
-        except ValueError:
-            body = {"error": response.text}
-
-        return response.status_code, body, url
-
-    def _request(self, method, path="", payload=None, params=None):
+    def _execute(self, query, params=None, fetch=True):
         self._validate_config()
-
-        if self.api_mode not in {"auto", "v1", "v2"}:
-            raise ValueError("NOCODB_API_MODE invalido. Usa: auto, v1 o v2")
-
-        if self.api_mode == "v1":
-            endpoints = [("v1", self._v1_table_url())]
-        elif self.api_mode == "v2":
-            endpoints = [("v2", self._v2_table_url())]
-        else:
-            endpoints = [
-                ("v1", self._v1_table_url()),
-                ("v2", self._v2_table_url()),
-            ]
-
-        last_error = None
-        for version, base_url in endpoints:
-            status_code, body, final_url = self._do_request(
-                base_url=base_url,
-                method=method,
-                path=path,
-                payload=payload,
-                params=params,
-            )
-
-            if status_code < 400:
-                return body
-
-            msg = (
-                body.get("msg") or body.get("message") or body.get("error") or str(body)
-            )
-            last_error = (
-                f"NocoDB {version} devolvio {status_code}: {msg} (URL: {final_url})"
-            )
-
-            if self.api_mode != "auto":
-                break
-
-        raise RuntimeError(last_error or "Error desconocido consultando NocoDB")
+        conn = self._get_connection()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(query, params)
+                if fetch:
+                    return cur.fetchall()
+                conn.commit()
+                return cur.rowcount
+        except psycopg2.Error:
+            conn.rollback()
+            raise
 
     def list_dispositivos(self):
-        body = self._request("GET", params={"limit": 1000})
-        if isinstance(body, dict) and "list" in body:
-            return body["list"]
-        if isinstance(body, list):
-            return body
-        return []
+        rows = self._execute(
+            "SELECT id, ip, nombre, departamento, fecha_registro, ultima_actualizacion FROM dispositivos ORDER BY id"
+        )
+        return [dict(row) for row in rows]
 
     def get_dispositivo(self, dispositivo_id):
-        return self._request("GET", path=dispositivo_id)
+        rows = self._execute(
+            "SELECT id, ip, nombre, departamento, fecha_registro, ultima_actualizacion FROM dispositivos WHERE id = %s",
+            (dispositivo_id,),
+        )
+        return dict(rows[0]) if rows else None
 
-    def create_dispositivo(self, payload):
-        return self._request("POST", payload=payload)
+    def create_dispositivo(self, ip, nombre, departamento=None):
+        self._execute(
+            "INSERT INTO dispositivos (ip, nombre, departamento) VALUES (%s, %s, %s)",
+            (ip, nombre, departamento),
+            fetch=False,
+        )
+        return self.get_dispositivo_by_ip(ip)
 
-    def update_dispositivo(self, dispositivo_id, payload):
-        return self._request("PATCH", path=dispositivo_id, payload=payload)
+    def update_dispositivo(self, dispositivo_id, ip=None, nombre=None, departamento=None):
+        fields = []
+        values = []
+        if ip is not None:
+            fields.append("ip = %s")
+            values.append(ip)
+        if nombre is not None:
+            fields.append("nombre = %s")
+            values.append(nombre)
+        if departamento is not None:
+            fields.append("departamento = %s")
+            values.append(departamento)
+
+        if not fields:
+            return None
+
+        values.append(dispositivo_id)
+        query = f"UPDATE dispositivos SET {', '.join(fields)} WHERE id = %s"
+        self._execute(query, tuple(values), fetch=False)
+        return self.get_dispositivo(dispositivo_id)
 
     def delete_dispositivo(self, dispositivo_id):
-        return self._request("DELETE", path=dispositivo_id)
+        self._execute(
+            "DELETE FROM dispositivos WHERE id = %s", (dispositivo_id,), fetch=False
+        )
+
+    def get_dispositivo_by_ip(self, ip):
+        rows = self._execute(
+            "SELECT id, ip, nombre, departamento, fecha_registro, ultima_actualizacion FROM dispositivos WHERE ip = %s",
+            (ip,),
+        )
+        return dict(rows[0]) if rows else None
 
 
-nocodb = NocoDBClient()
+database = DatabaseClient()
 
 
 def validar_ip(valor):
@@ -182,7 +172,7 @@ def validar_ip(valor):
 
 def cargar_dispositivos():
     global cached_devices
-    cached_devices = nocodb.list_dispositivos()
+    cached_devices = database.list_dispositivos()
     return cached_devices
 
 
@@ -284,7 +274,7 @@ def ejecutar_envio(mensaje, resultado, request_id, departamento_objetivo=None):
     try:
         dispositivos = cargar_dispositivos()
     except Exception as exc:
-        resultado["error"] = f"No se pudo leer NocoDB: {exc}"
+        resultado["error"] = f"No se pudo leer la base de datos: {exc}"
         send_in_progress = False
         return
 
@@ -298,7 +288,7 @@ def ejecutar_envio(mensaje, resultado, request_id, departamento_objetivo=None):
                 f"No hay dispositivos en el departamento '{departamento_objetivo}'"
             )
         else:
-            resultado["error"] = "No hay dispositivos en NocoDB"
+            resultado["error"] = "No hay dispositivos en la base de datos"
         send_in_progress = False
         return
 
@@ -417,12 +407,13 @@ def listar_departamentos():
         return jsonify({"error": str(exc)}), 502
 
 
-@app.route("/api/dispositivos/<dispositivo_id>", methods=["GET"])
+@app.route("/api/dispositivos/<int:dispositivo_id>", methods=["GET"])
 def obtener_dispositivo(dispositivo_id):
     try:
-        return jsonify(
-            {"success": True, "data": nocodb.get_dispositivo(dispositivo_id)}
-        )
+        dispositivo = database.get_dispositivo(dispositivo_id)
+        if dispositivo is None:
+            return jsonify({"error": "Dispositivo no encontrado"}), 404
+        return jsonify({"success": True, "data": dispositivo})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
 
@@ -439,55 +430,53 @@ def crear_dispositivo():
         if not validar_ip(ip):
             return jsonify({"error": "IP invalida"}), 400
 
-        payload = {
-            "ip": ip,
-            "nombre": nombre,
-            "departamento": data.get("departamento"),
-        }
-        creado = nocodb.create_dispositivo(payload)
+        existente = database.get_dispositivo_by_ip(ip)
+        if existente:
+            return jsonify({"error": f"La IP {ip} ya existe"}), 400
+
+        creado = database.create_dispositivo(ip, nombre, data.get("departamento"))
         cargar_dispositivos()
         return jsonify({"success": True, "data": creado}), 201
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
 
 
-@app.route("/api/dispositivos/<dispositivo_id>", methods=["PUT"])
+@app.route("/api/dispositivos/<int:dispositivo_id>", methods=["PUT"])
 def actualizar_dispositivo(dispositivo_id):
     try:
         data = request.json or {}
-        payload = {}
+        ip = data.get("ip")
+        nombre = data.get("nombre")
+        departamento = data.get("departamento")
 
-        if "ip" in data:
-            ip = str(data.get("ip", "")).strip()
+        if ip is not None:
+            ip = str(ip).strip()
             if not ip:
                 return jsonify({"error": "El campo ip no puede estar vacio"}), 400
             if not validar_ip(ip):
                 return jsonify({"error": "IP invalida"}), 400
-            payload["ip"] = ip
 
-        if "nombre" in data:
-            nombre = str(data.get("nombre", "")).strip()
+        if nombre is not None:
+            nombre = str(nombre).strip()
             if not nombre:
                 return jsonify({"error": "El campo nombre no puede estar vacio"}), 400
-            payload["nombre"] = nombre
 
-        if "departamento" in data:
-            payload["departamento"] = data.get("departamento")
+        actualizado = database.update_dispositivo(
+            dispositivo_id, ip=ip, nombre=nombre, departamento=departamento
+        )
+        if actualizado is None:
+            return jsonify({"error": "Dispositivo no encontrado"}), 404
 
-        if not payload:
-            return jsonify({"error": "No se enviaron campos para actualizar"}), 400
-
-        actualizado = nocodb.update_dispositivo(dispositivo_id, payload)
         cargar_dispositivos()
         return jsonify({"success": True, "data": actualizado})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
 
 
-@app.route("/api/dispositivos/<dispositivo_id>", methods=["DELETE"])
+@app.route("/api/dispositivos/<int:dispositivo_id>", methods=["DELETE"])
 def eliminar_dispositivo(dispositivo_id):
     try:
-        nocodb.delete_dispositivo(dispositivo_id)
+        database.delete_dispositivo(dispositivo_id)
         cargar_dispositivos()
         return jsonify({"success": True, "message": "Dispositivo eliminado"})
     except Exception as exc:
@@ -512,7 +501,7 @@ def upload_file():
     return jsonify({"success": True, "filename": filename, "message": "Archivo subido"})
 
 
-@app.route("/api/download/<filename>", methods=["GET"])
+@app.route("/api/download/<path:filename>", methods=["GET"])
 def download_file(filename):
     if not secure_filename(filename):
         return jsonify({"error": "Nombre de archivo invalido"}), 400
@@ -540,7 +529,7 @@ if __name__ == "__main__":
     try:
         cargar_dispositivos()
     except Exception as exc:
-        print(f"No se pudo conectar a NocoDB al iniciar: {exc}")
+        print(f"No se pudo conectar a la base de datos al iniciar: {exc}")
 
     print("Servidor iniciado en http://localhost:8080")
     app.run(host="0.0.0.0", port=8080, debug=False, threaded=True)
