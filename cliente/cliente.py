@@ -28,7 +28,9 @@ def configurar_logging():
     try:
         log_dir = os.path.join(obtener_directorio_base(), "logs")
         os.makedirs(log_dir, exist_ok=True)
-        log_file = os.path.join(log_dir, f"esclavo_{datetime.now().strftime('%Y%m%d')}.log")
+        log_file = os.path.join(
+            log_dir, f"flashcast_{datetime.now().strftime('%Y%m%d')}.log"
+        )
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s - %(levelname)s - %(message)s",
@@ -104,7 +106,9 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
     ancho_ventana = 900  # antes 720
     ancho_pantalla = root.winfo_screenwidth()
     alto_pantalla = root.winfo_screenheight()
-    alto_ventana = min(800, max(600, alto_pantalla - 80))  # antes min(600, max(420, ...))
+    alto_ventana = min(
+        800, max(600, alto_pantalla - 80)
+    )  # antes min(600, max(420, ...))
     x = (ancho_pantalla - ancho_ventana) // 2
     y = (alto_pantalla - alto_ventana) // 2
 
@@ -316,8 +320,12 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
                 )
 
                 if not carpeta_destino:
-                    estado_descarga.set("Debe seleccionar una carpeta para descargar el archivo adjunto.")
-                    error_label.config(text="Seleccione una carpeta válida para continuar.")
+                    estado_descarga.set(
+                        "Debe seleccionar una carpeta para descargar el archivo adjunto."
+                    )
+                    error_label.config(
+                        text="Seleccione una carpeta válida para continuar."
+                    )
                     root.after(5000, lambda: error_label.config(text=""))
                     return
 
@@ -330,8 +338,12 @@ def mostrar_alerta(parent_root, mensaje, archivo_nombre=None, servidor_host=None
                 )
 
                 if not ruta_descargada:
-                    estado_descarga.set("No se pudo descargar el archivo. Revise la conexión con el servidor.")
-                    error_label.config(text="Ocurrió un error al descargar el archivo adjunto.")
+                    estado_descarga.set(
+                        "No se pudo descargar el archivo. Revise la conexión con el servidor."
+                    )
+                    error_label.config(
+                        text="Ocurrió un error al descargar el archivo adjunto."
+                    )
                     root.after(5000, lambda: error_label.config(text=""))
                     return
 
@@ -498,11 +510,11 @@ def iniciar_cliente():
                     else:
                         # Verificar si el mensaje contiene información de archivo adjunto
                         archivo_nombre = None
-                        if mensaje.startswith('{') and mensaje.endswith('}'):  # JSON
+                        if mensaje.startswith("{") and mensaje.endswith("}"):  # JSON
                             try:
                                 data_msg = json.loads(mensaje)
-                                mensaje_texto = data_msg.get('mensaje', '')
-                                archivo_nombre = data_msg.get('archivo')
+                                mensaje_texto = data_msg.get("mensaje", "")
+                                archivo_nombre = data_msg.get("archivo")
                             except Exception as e:
                                 logger.error(f"Error decodificando JSON recibido: {e}")
                                 mensaje_texto = mensaje
@@ -550,7 +562,9 @@ def descargar_documento(
     carpeta_destino=None,
 ):
     """Descarga un documento desde el backend y lo guarda en la carpeta local."""
-    ruta_descarga = carpeta_destino or os.path.join(obtener_directorio_base(), "descargas")
+    ruta_descarga = carpeta_destino or os.path.join(
+        obtener_directorio_base(), "descargas"
+    )
     os.makedirs(ruta_descarga, exist_ok=True)
 
     nombre_archivo_seguro = os.path.basename(nombre_archivo)
@@ -566,7 +580,9 @@ def descargar_documento(
             logger.info(f"Documento descargado: {ruta_archivo}")
             return ruta_archivo
 
-        logger.error(f"Error al descargar desde {url}: {respuesta.status_code} - {respuesta.text}")
+        logger.error(
+            f"Error al descargar desde {url}: {respuesta.status_code} - {respuesta.text}"
+        )
         return None
     except Exception as e:
         logger.error(f"Error en la descarga desde {url}: {e}")
@@ -602,7 +618,7 @@ def manejar_signal(signum, frame):
 
 if __name__ == "__main__":
     logger.info("=" * 60)
-    logger.info("ESCLAVO - Servidor de Notificaciones")
+    logger.info("FLASHCAST - Servidor de Notificaciones")
     logger.info("=" * 60)
     logger.info(f"HOST: {CONFIG['HOST']}, PORT: {CONFIG['PORT']}")
     logger.info(f"Proceso bloqueante: {CONFIG['PROCESO_BLOQUEANTE']}")

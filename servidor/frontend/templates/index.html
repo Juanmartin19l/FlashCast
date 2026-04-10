@@ -18,39 +18,39 @@
         </svg>
       </div>
       <h1>FlashCast</h1>
-      <p class="subtitle">Sistema de notificaciones en red local</p>
-      <button id="btnEditar" class="btn-editar" title="Editar máquinas">⚙ Editar máquinas</button>
     </header>
 
     <div class="content">
       <div class="mensaje-section">
         <div class="section-header">
           <h2>Mensaje a enviar</h2>
+          <p class="section-subtitle">Redacta el mensaje, selecciona el destino y envíalo en segundos.</p>
         </div>
-        <textarea id="mensaje" placeholder="Escribe aquí el mensaje que deseas enviar a todos los equipos..."># Notificación Importante
+        <textarea id="mensaje" placeholder="Ejemplo:
+# Notificación importante
+Recordatorio de reunión a las 10:30 en sala principal."></textarea>
 
-      ## Mensaje de la gerencia
-
-      Esto es un mensaje de **ejemplo** con **negritas**.
-
-      El sistema soporta:
-      - # para encabezados principales
-      - ## para encabezados secundarios
-      - ** ** para **texto en negrita**
-
-      Personaliza este mensaje según tus necesidades.</textarea>
+        <div class="filtro-section">
+          <label for="departamento" class="filtro-label">Departamento (opcional)</label>
+          <select id="departamento">
+            <option value="">Todos los departamentos</option>
+          </select>
+          <small class="filtro-help">Si lo completas, el mensaje se enviará solo a ese departamento.</small>
+        </div>
 
         <div class="adjuntar-section">
           <label for="archivo" class="adjuntar-label">
             <span class="icon-clip">📎</span> Adjuntar archivo
             <span id="archivo-nombre" class="archivo-nombre">Ningún archivo seleccionado</span>
           </label>
+          <button id="btnQuitarArchivo" type="button" class="btn-quitar-archivo" style="display: none;">Quitar
+            archivo</button>
           <input type="file" id="archivo" name="archivo" style="display:none;">
         </div>
 
         <div class="btn-group">
           <button id="btnEnviar" class="btn-enviar">
-            Enviar a toda la red
+            Enviar mensaje
           </button>
 
           <button id="btnCancelar" class="btn-cancelar" style="display: none;">
@@ -60,23 +60,6 @@
       </div>
 
       <!-- Log de actividad eliminado -->
-    </div>
-  </div>
-
-  <!-- Modal para editar máquinas -->
-  <div id="modalEditar" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Editar máquinas</h2>
-        <button class="modal-close" id="btnCerrarModal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <textarea id="jsonEditor" placeholder="Esperando cargar machines.json..."></textarea>
-      </div>
-      <div class="modal-footer">
-        <button id="btnGuardar" class="btn-guardar">Guardar cambios</button>
-        <button id="btnCancelarEdicion" class="btn-cancelar-modal">Cancelar</button>
-      </div>
     </div>
   </div>
 

@@ -7,10 +7,8 @@ The **FlashCast Server** is a Flask web server that enables mass messaging to al
 ## Características
 
 - 🌐 **Interfaz Web Moderna**: Panel de control accesible desde el navegador
-- 🔍 **Descubrimiento de Máquinas**: Detecta dispositivos en la red local (ejecutado localmente)
 - 📨 **Envío Masivo Concurrente**: Utiliza 500 hilos para envío rápido
-- 💾 **Persistencia de Máquinas**: Guarda máquinas en machines.json
-- 📡 **Actualizaciones en Tiempo Real**: Server-Sent Events (SSE) para logs dinámicos
+- 🗂️ **Persistencia en NocoDB**: Dispositivos administrados desde tabla `dispositivos`
 - 🛑 **Cancelación de Envíos**: Posibilidad de detener un envío en progreso
 - 🐳 **Containerizado**: Ejecuta en Docker para fácil despliegue
 
@@ -18,7 +16,6 @@ The **FlashCast Server** is a Flask web server that enables mass messaging to al
 
 - Python 3.12+
 - Docker y Docker Compose (para el servidor)
-- Flask (para discovery_service local)
 - Acceso a la red local
 
 ## Instalación y Uso
@@ -53,15 +50,15 @@ El servidor estará disponible en:
 - **Web Interface**: http://localhost:8080
 - **TCP Server**: Port 5000 (comunicación con clientes)
 
-### 3. Ejecutar Discovery Service (Local)
+### 3. Configurar NocoDB
 
-**En otra terminal**, ejecuta:
+En `servidor/.env` configura:
 
-```bash
-python servidor/backend/discovery_service.py
-```
-
-Este servicio escanea la red cada 5 minutos buscando máquinas con patrón **TESO-\*** y actualiza `machines.json`.
+- `NOCODB_BASE_URL`
+- `NOCODB_API_TOKEN`
+- `NOCODB_ORG`
+- `NOCODB_PROJECT`
+- `NOCODB_TABLE=dispositivos`
 
 ### 4. Acceder al Panel
 
@@ -90,33 +87,11 @@ MAX_HILOS = 500            # Hilos concurrentes para envío
 MAX_CARACTERES = 2048      # Límite de caracteres del mensaje
 ```
 
-### Discovery Service
-
-Las variables de entorno pueden configurarse en el terminal:
-
-```bash
-# Red a escanear (por defecto: 10.6)
-set NETWORK_PREFIX=10.6  # Windows
-export NETWORK_PREFIX=10.6  # Linux/Mac
-
-# Patrón de hostname (por defecto: TESO-)
-set HOSTNAME_PATTERN=TESO-  # Windows
-export HOSTNAME_PATTERN=TESO-  # Linux/Mac
-
-# Intervalo de escaneo en segundos (por defecto: 300 = 5 minutos)
-set SCAN_INTERVAL=300  # Windows
-export SCAN_INTERVAL=300  # Linux/Mac
-
-# Número de workers para el escaneo (por defecto: 100)
-set SCAN_WORKERS=100  # Windows
-export SCAN_WORKERS=100  # Linux/Mac
-```
-
 ## Estructura de Archivos
 
 ```
 backend/
-  └── maestro_web.py       # Servidor principal
+  └── servidor.py          # Servidor principal
 
 frontend/
   ├── templates/
@@ -125,8 +100,8 @@ frontend/
       ├── script.js        # Lógica del frontend
       └── style.css        # Estilos
 
-data/
-  └── historial_ips.json   # Base de datos de IPs contactadas
+NocoDB (tabla `dispositivos`)
+  └── id, ip, nombre, departamento, fecha_registro, ultima_actualizacion
 ```
 
 ## Funcionalidad Técnica
@@ -135,33 +110,27 @@ data/
 
 1. Usuario escribe mensaje y presiona "Enviar"
 2. Maestro valida el mensaje (max 2048 bytes UTF-8)
-3. **Primera fase**: Envía a IPs del historial (conocidas)
-4. **Segunda fase**: Escanea toda la red local (rango /16)
-5. Cada IP que responde se guarda en `historial_ips.json`
-6. Los logs se transmiten en tiempo real vía SSE
+3. Consulta dispositivos en NocoDB
+4. Envía de forma concurrente a las IPs únicas
+5. Devuelve detalle de éxitos y errores
 
 ### API Endpoints
 
 - `GET /` - Interfaz web principal
 - `POST /api/enviar` - Iniciar envío de mensaje
 - `POST /api/cancelar` - Cancelar envío en progreso
-- `GET /api/stream` - Stream SSE de logs
 - `GET /api/estadisticas` - Obtener estadísticas actuales
-
-### Tipos de Logs
-
-- 🟢 **Nueva**: IP contactada por primera vez (verde)
-- 🔵 **Repetida**: IP ya existente en historial (azul)
-- ℹ️ **Info**: Mensajes informativos (gris)
-- ✅ **Success**: Operación exitosa (verde)
-- ❌ **Error**: Errores durante el envío (rojo)
+- `GET /api/dispositivos` - Listar dispositivos
+- `GET /api/dispositivos/{id}` - Obtener dispositivo
+- `POST /api/dispositivos` - Crear dispositivo
+- `PUT /api/dispositivos/{id}` - Actualizar dispositivo
+- `DELETE /api/dispositivos/{id}` - Eliminar dispositivo
 
 ## Seguridad y Notas
 
 - El servidor solo es accesible desde la red local
 - Los mensajes están limitados a 2048 bytes
-- El timeout de 0.3s evita bloqueos en IPs inactivas
-- El historial persiste entre reinicios del servidor
+- El timeout configurable evita bloqueos en IPs inactivas
 
 ## Solución de Problemas
 
@@ -171,37 +140,24 @@ data/
 - Verifica que Docker esté corriendo
 - Revisa los logs: `docker compose logs`
 
-### Discovery Service no encuentra máquinas
+### NocoDB no responde
 
-- Verifica que estés ejecutándolo en tu máquina local (NO en Docker)
-- Verifica el patrón de hostname: `ipconfig /all` (Windows) o `ifconfig` (Linux/Mac)
-- Ajusta `NETWORK_PREFIX` si tu red no es `10.6.x.x`
-- Verifica el firewall local permite ping
+- Verifica URL y token en `servidor/.env`
+- Verifica conectividad desde el contenedor al host de NocoDB
+- Revisa que la tabla configurada exista y sea accesible
 
 ### Los mensajes no llegan a los clientes
 
 - Verifica que el firewall permita conexiones TCP al puerto 5000
 - Confirma que los clientes estén ejecutándose
 - Revisa los logs en tiempo real en la interfaz web
-- Verifica que las máquinas están en `machines.json`
-
-### El escaneo es muy lento
-
-- Aumenta `SCAN_WORKERS` (ej: 200)
-- Reduce `PING_TIMEOUT_VALUE` en discovery_service.py
-- Considera reducir el rango de IPs a escanear en `NETWORK_PREFIX`
+- Verifica que los dispositivos existen en la tabla `dispositivos`
 
 ## Mantenimiento
 
-### Limpiar Historial
+### Limpiar dispositivos
 
-Para reiniciar el historial de IPs, simplemente elimina o vacía el archivo:
-
-```bash
-rm servidor/data/historial_ips.json
-```
-
-El archivo se recreará automáticamente en el próximo envío.
+Gestiona altas/bajas desde NocoDB o usando el CRUD del servidor (`/api/dispositivos`).
 
 ### Ver Logs del Servidor
 

@@ -1,118 +1,229 @@
-import socket
-from concurrent.futures import ThreadPoolExecutor
+import ipaddress
 import json
 import os
-from datetime import datetime
-from flask import Flask, render_template, request, jsonify, Response, send_from_directory
+import socket
 import threading
-import queue
 import time
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+
+import requests
+from flask import Flask, jsonify, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
 
-# --- CONFIGURACIÓN ---
-PUERTO = 5000
-TIMEOUT = 2.0  # Segundos de espera para conexión
-MAX_HILOS = 500
-ARCHIVO_MAQUINAS = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "data", "machines.json"
-)
-MAX_CARACTERES = 2048  # Límite de caracteres del mensaje
 
-# Configurar Flask para usar las carpetas del frontend
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+
+
+def cargar_env_local(path_env):
+    if not os.path.exists(path_env):
+        return
+
+    with open(path_env, "r", encoding="utf-8") as f:
+        for linea in f:
+            linea = linea.strip()
+            if not linea or linea.startswith("#") or "=" not in linea:
+                continue
+
+            clave, valor = linea.split("=", 1)
+            clave = clave.strip()
+            valor = valor.strip().strip('"').strip("'")
+            if clave and clave not in os.environ:
+                os.environ[clave] = valor
+
+
+cargar_env_local(os.path.join(BASE_DIR, ".env"))
+
+TARGET_PORT = int(os.environ.get("TARGET_PORT", "5000"))
+SEND_TIMEOUT = float(os.environ.get("SEND_TIMEOUT", "2.0"))
+SEND_MAX_THREADS = int(os.environ.get("SEND_MAX_THREADS", "500"))
+MAX_MESSAGE_BYTES = 2048
+
 app = Flask(
     __name__,
-    template_folder=os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "frontend", "templates"
-    ),
-    static_folder=os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "frontend", "static"
-    ),
+    template_folder=os.path.join(BASE_DIR, "frontend", "templates"),
+    static_folder=os.path.join(BASE_DIR, "frontend", "static"),
 )
 
-# Variables globales
-log_queue = queue.Queue()
-contador_enviados = 0
-maquinas_cache = {}  # Cache del archivo machines.json
-lock = threading.Lock()
-enviando = False
-cancelar_envio = False
-
-# Carpeta para subir documentos
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
+send_lock = threading.Lock()
+send_in_progress = False
+send_cancel_requested = False
+sent_counter = 0
+cached_devices = []
 
-def cargar_maquinas():
-    """Carga la lista de máquinas desde machines.json"""
-    if os.path.exists(ARCHIVO_MAQUINAS):
+
+class NocoDBClient:
+    def __init__(self):
+        self.base_url = os.environ.get("NOCODB_BASE_URL", "").rstrip("/")
+        self.api_token = os.environ.get("NOCODB_API_TOKEN", "")
+        self.org = os.environ.get("NOCODB_ORG", "noco")
+        self.project = os.environ.get("NOCODB_PROJECT", "nc")
+        self.table = os.environ.get("NOCODB_TABLE", "dispositivos")
+        self.api_mode = os.environ.get("NOCODB_API_MODE", "auto").strip().lower()
+        self.request_timeout = int(os.environ.get("NOCODB_TIMEOUT", "10"))
+
+    def _headers(self):
+        return {"xc-token": self.api_token, "Content-Type": "application/json"}
+
+    def _v1_table_url(self):
+        return (
+            f"{self.base_url}/api/v1/db/data/v1/{self.org}/{self.project}/{self.table}"
+        )
+
+    def _v2_table_url(self):
+        return f"{self.base_url}/api/v2/tables/{self.table}/records"
+
+    def _validate_config(self):
+        missing = []
+        if not self.base_url:
+            missing.append("NOCODB_BASE_URL")
+        if not self.api_token:
+            missing.append("NOCODB_API_TOKEN")
+        if missing:
+            raise ValueError(f"Faltan variables de entorno: {', '.join(missing)}")
+
+    def _do_request(self, base_url, method, path="", payload=None, params=None):
+        url = base_url
+        if path:
+            url = f"{url}/{path}"
+
+        response = requests.request(
+            method=method,
+            url=url,
+            headers=self._headers(),
+            json=payload,
+            params=params,
+            timeout=self.request_timeout,
+        )
+
         try:
-            with open(ARCHIVO_MAQUINAS, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
-            print(f"Error cargando machines.json: {e}")
-            return {}
-    return {}
+            body = response.json()
+        except ValueError:
+            body = {"error": response.text}
+
+        return response.status_code, body, url
+
+    def _request(self, method, path="", payload=None, params=None):
+        self._validate_config()
+
+        if self.api_mode not in {"auto", "v1", "v2"}:
+            raise ValueError("NOCODB_API_MODE invalido. Usa: auto, v1 o v2")
+
+        if self.api_mode == "v1":
+            endpoints = [("v1", self._v1_table_url())]
+        elif self.api_mode == "v2":
+            endpoints = [("v2", self._v2_table_url())]
+        else:
+            endpoints = [
+                ("v1", self._v1_table_url()),
+                ("v2", self._v2_table_url()),
+            ]
+
+        last_error = None
+        for version, base_url in endpoints:
+            status_code, body, final_url = self._do_request(
+                base_url=base_url,
+                method=method,
+                path=path,
+                payload=payload,
+                params=params,
+            )
+
+            if status_code < 400:
+                return body
+
+            msg = (
+                body.get("msg") or body.get("message") or body.get("error") or str(body)
+            )
+            last_error = (
+                f"NocoDB {version} devolvio {status_code}: {msg} (URL: {final_url})"
+            )
+
+            if self.api_mode != "auto":
+                break
+
+        raise RuntimeError(last_error or "Error desconocido consultando NocoDB")
+
+    def list_dispositivos(self):
+        body = self._request("GET", params={"limit": 1000})
+        if isinstance(body, dict) and "list" in body:
+            return body["list"]
+        if isinstance(body, list):
+            return body
+        return []
+
+    def get_dispositivo(self, dispositivo_id):
+        return self._request("GET", path=dispositivo_id)
+
+    def create_dispositivo(self, payload):
+        return self._request("POST", payload=payload)
+
+    def update_dispositivo(self, dispositivo_id, payload):
+        return self._request("PATCH", path=dispositivo_id, payload=payload)
+
+    def delete_dispositivo(self, dispositivo_id):
+        return self._request("DELETE", path=dispositivo_id)
 
 
-def agregar_log(texto, tipo="info"):
-    """Agrega una línea al log"""
-    log_queue.put({"texto": texto, "tipo": tipo, "timestamp": time.time()})
+nocodb = NocoDBClient()
 
 
-def log_event(evento, **kwargs):
-    """Log estructurado para stdout (visible en docker logs)."""
-    payload = {
-        "evento": evento,
-        "timestamp": datetime.utcnow().isoformat(timespec="milliseconds") + "Z",
-    }
-    payload.update(kwargs)
-    print(f"[{evento}] {json.dumps(payload, ensure_ascii=False)}")
+def validar_ip(valor):
+    try:
+        ipaddress.ip_address(str(valor).strip())
+        return True
+    except ValueError:
+        return False
 
 
-def allowed_file(filename):
-    return bool(filename and secure_filename(filename))
+def cargar_dispositivos():
+    global cached_devices
+    cached_devices = nocodb.list_dispositivos()
+    return cached_devices
 
 
-def construir_targets(maquinas):
-    """
-    Construye una lista de destinos únicos por IP.
-    Cada destino conserva uno o más hostnames asociados.
-    """
+def normalizar_texto(valor):
+    return str(valor or "").strip().lower()
+
+
+def construir_targets(dispositivos, departamento_objetivo=None):
     targets_by_ip = {}
+    depto_buscado = normalizar_texto(departamento_objetivo)
 
-    for hostname, data in maquinas.items():
-        ip = None
-        if isinstance(data, dict):
-            ip = data.get("ip")
-        elif isinstance(data, str):
-            ip = data
-
-        if not ip:
+    for dispositivo in dispositivos:
+        if not isinstance(dispositivo, dict):
             continue
 
-        ip = str(ip).strip()
-        if not ip:
+        ip = str(dispositivo.get("ip", "")).strip()
+        nombre = str(dispositivo.get("nombre", "")).strip()
+        departamento = normalizar_texto(dispositivo.get("departamento"))
+        if not ip or not nombre:
+            continue
+
+        if depto_buscado and departamento != depto_buscado:
             continue
 
         if ip not in targets_by_ip:
             targets_by_ip[ip] = {"ip": ip, "hostnames": []}
 
-        if hostname not in targets_by_ip[ip]["hostnames"]:
-            targets_by_ip[ip]["hostnames"].append(hostname)
+        if nombre not in targets_by_ip[ip]["hostnames"]:
+            targets_by_ip[ip]["hostnames"].append(nombre)
 
     return list(targets_by_ip.values())
 
 
 def enviar_a_ip(target, mensaje, request_id):
-    global contador_enviados, cancelar_envio
+    global sent_counter, send_cancel_requested
 
     ip = target["ip"]
     hostnames = target["hostnames"]
     inicio = time.perf_counter()
 
-    if cancelar_envio:
+    if send_cancel_requested:
         return {
             "ok": False,
             "ip": ip,
@@ -124,106 +235,93 @@ def enviar_a_ip(target, mensaje, request_id):
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(TIMEOUT)
-            s.connect((str(ip), PUERTO))
+            s.settimeout(SEND_TIMEOUT)
+            s.connect((ip, TARGET_PORT))
             s.sendall(mensaje.encode("utf-8"))
 
             duracion_ms = round((time.perf_counter() - inicio) * 1000, 2)
-            with lock:
-                contador_enviados += 1
-            log_event(
-                "SEND_OK",
-                request_id=request_id,
-                ip=ip,
-                hostnames=hostnames,
-                puerto=PUERTO,
-                duracion_ms=duracion_ms,
-                bytes_enviados=len(mensaje.encode("utf-8")),
+            with send_lock:
+                sent_counter += 1
+
+            print(
+                json.dumps(
+                    {
+                        "evento": "SEND_OK",
+                        "request_id": request_id,
+                        "ip": ip,
+                        "hostnames": hostnames,
+                        "duracion_ms": duracion_ms,
+                    },
+                    ensure_ascii=False,
+                )
             )
+
             return {
                 "ok": True,
                 "ip": ip,
                 "hostnames": hostnames,
                 "duracion_ms": duracion_ms,
             }
-    except Exception as e:
+    except Exception as exc:
         duracion_ms = round((time.perf_counter() - inicio) * 1000, 2)
-        log_event(
-            "SEND_ERROR",
-            request_id=request_id,
-            ip=ip,
-            hostnames=hostnames,
-            puerto=PUERTO,
-            duracion_ms=duracion_ms,
-            error=str(e),
-        )
         return {
             "ok": False,
             "ip": ip,
             "hostnames": hostnames,
             "duracion_ms": duracion_ms,
-            "error": str(e),
+            "error": str(exc),
         }
 
 
-def iniciar_bombardeo(mensaje, resultado, request_id):
-    global contador_enviados, enviando, cancelar_envio, maquinas_cache
+def ejecutar_envio(mensaje, resultado, request_id, departamento_objetivo=None):
+    global sent_counter, send_in_progress, send_cancel_requested
 
-    inicio_envio = time.perf_counter()
-    enviando = True
-    cancelar_envio = False
+    send_in_progress = True
+    send_cancel_requested = False
+    with send_lock:
+        sent_counter = 0
 
-    with lock:
-        contador_enviados = 0
-
-    maquinas_cache = cargar_maquinas()
-    targets = construir_targets(maquinas_cache)
-
-    if not targets:
-        resultado["error"] = "No hay máquinas en machines.json"
-        enviando = False
+    try:
+        dispositivos = cargar_dispositivos()
+    except Exception as exc:
+        resultado["error"] = f"No se pudo leer NocoDB: {exc}"
+        send_in_progress = False
         return
 
-    log_event(
-        "SEND_START",
-        request_id=request_id,
-        total_destinos=len(targets),
-        timeout_segundos=TIMEOUT,
-        puerto_destino=PUERTO,
+    targets = construir_targets(
+        dispositivos=dispositivos,
+        departamento_objetivo=departamento_objetivo,
     )
+    if not targets:
+        if departamento_objetivo:
+            resultado["error"] = (
+                f"No hay dispositivos en el departamento '{departamento_objetivo}'"
+            )
+        else:
+            resultado["error"] = "No hay dispositivos en NocoDB"
+        send_in_progress = False
+        return
 
-    resultados = []
-    with ThreadPoolExecutor(max_workers=MAX_HILOS) as executor:
-        resultados = list(
-            executor.map(lambda target: enviar_a_ip(target, mensaje, request_id), targets)
+    with ThreadPoolExecutor(max_workers=SEND_MAX_THREADS) as executor:
+        detalles = list(
+            executor.map(
+                lambda target: enviar_a_ip(target, mensaje, request_id), targets
+            )
         )
 
-    errores = [r for r in resultados if not r["ok"]]
-    exitos = [r for r in resultados if r["ok"]]
-    duracion_total_ms = round((time.perf_counter() - inicio_envio) * 1000, 2)
+    errores = [item for item in detalles if not item["ok"]]
+    exitos = [item for item in detalles if item["ok"]]
 
-    if cancelar_envio:
-        resultado["error"] = "Envío cancelado"
+    if send_cancel_requested:
+        resultado["error"] = "Envio cancelado"
     elif errores:
-        resultado["error"] = (
-            f"{len(errores)} clientes tuvieron error y {len(exitos)} recibieron OK"
-        )
+        resultado["error"] = f"{len(errores)} fallaron y {len(exitos)} se enviaron"
     else:
         resultado["success"] = True
         resultado["message"] = "Mensaje enviado exitosamente"
 
-    resultado["detalles"] = resultados
-    log_event(
-        "SEND_SUMMARY",
-        request_id=request_id,
-        total=len(resultados),
-        exitos=len(exitos),
-        errores=len(errores),
-        cancelado=cancelar_envio,
-        duracion_total_ms=duracion_total_ms,
-    )
-
-    enviando = False
+    resultado["detalles"] = detalles
+    send_in_progress = False
 
 
 @app.route("/")
@@ -233,142 +331,196 @@ def index():
 
 @app.route("/api/enviar", methods=["POST"])
 def enviar_mensaje():
-    global enviando
+    global send_in_progress
 
-    if enviando:
-        return jsonify({"error": "Ya hay un envío en progreso"}), 400
+    if send_in_progress:
+        return jsonify({"error": "Ya hay un envio en progreso"}), 400
 
-    data = request.json
-    mensaje = data.get("mensaje", "").strip()
+    data = request.json or {}
+    mensaje = str(data.get("mensaje", "")).strip()
     archivo = data.get("archivo")
-    request_id = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
-    log_event(
-        "SEND_REQUEST",
-        request_id=request_id,
-        client_ip=request.remote_addr,
-        archivo=archivo,
-        mensaje_bytes=len(mensaje.encode("utf-8")),
-    )
+    departamento = str(data.get("departamento", "")).strip()
 
     if not mensaje:
         return jsonify({"error": "Debes escribir un mensaje"}), 400
 
     mensaje_bytes = len(mensaje.encode("utf-8"))
-    if mensaje_bytes > MAX_CARACTERES:
+    if mensaje_bytes > MAX_MESSAGE_BYTES:
         return (
             jsonify(
                 {
-                    "error": f"El mensaje es demasiado largo. Máximo {MAX_CARACTERES} bytes. Tu mensaje tiene {mensaje_bytes} bytes."
+                    "error": f"Maximo {MAX_MESSAGE_BYTES} bytes, recibidos {mensaje_bytes}",
                 }
             ),
             400,
         )
 
-    mensaje_envio = json.dumps({"mensaje": mensaje, "archivo": archivo} if archivo else {"mensaje": mensaje}, ensure_ascii=False)
-    log_event("SEND_PAYLOAD_READY", request_id=request_id, mensaje_preview=mensaje[:120])
+    payload = {"mensaje": mensaje}
+    if archivo:
+        payload["archivo"] = archivo
 
+    request_id = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
     resultado = {}
-    thread = threading.Thread(
-        target=iniciar_bombardeo,
-        args=(mensaje_envio, resultado, request_id),
-        daemon=True,
+    ejecutar_envio(
+        mensaje=json.dumps(payload, ensure_ascii=False),
+        resultado=resultado,
+        request_id=request_id,
+        departamento_objetivo=departamento or None,
     )
-    thread.start()
-    thread.join()  # Esperar a que termine para responder con el resultado
 
     if "error" in resultado:
-        return (
-            jsonify(
-                {
-                    "error": resultado["error"],
-                    "request_id": request_id,
-                    "detalles": resultado.get("detalles", []),
-                }
-            ),
-            400,
-        )
+        return jsonify(
+            {"error": resultado["error"], "detalles": resultado.get("detalles", [])}
+        ), 400
+
     return jsonify(
         {
             "success": True,
             "message": resultado.get("message", "Mensaje enviado exitosamente"),
             "request_id": request_id,
+            "departamento": departamento or None,
             "detalles": resultado.get("detalles", []),
         }
     )
 
 
 @app.route("/api/cancelar", methods=["POST"])
-def cancelar():
-    global cancelar_envio
+def cancelar_envio():
+    global send_cancel_requested
 
-    if not enviando:
-        return jsonify({"error": "No hay ningún envío en progreso"}), 400
+    if not send_in_progress:
+        return jsonify({"error": "No hay ningun envio en progreso"}), 400
 
-    cancelar_envio = True
-    agregar_log("Solicitando cancelación...", "info")
-
-    return jsonify({"success": True, "message": "Cancelación solicitada"})
+    send_cancel_requested = True
+    return jsonify({"success": True, "message": "Cancelacion solicitada"})
 
 
-@app.route("/api/machines", methods=["GET"])
-def obtener_machines():
-    """Obtiene el contenido de machines.json"""
-    maquinas = cargar_maquinas()
-    return jsonify(maquinas)
-
-
-@app.route("/api/machines", methods=["POST"])
-def guardar_machines():
-    """Guarda el contenido de machines.json"""
+@app.route("/api/dispositivos", methods=["GET"])
+def listar_dispositivos():
     try:
-        data = request.json
+        return jsonify({"success": True, "data": cargar_dispositivos()})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
 
-        # Validar que sea un diccionario
-        if not isinstance(data, dict):
-            return jsonify({"error": "El contenido debe ser un objeto JSON"}), 400
 
-        # Guardar en archivo
-        os.makedirs(os.path.dirname(ARCHIVO_MAQUINAS), exist_ok=True)
-        with open(ARCHIVO_MAQUINAS, "w") as f:
-            json.dump(data, f, indent=2)
+@app.route("/api/departamentos", methods=["GET"])
+def listar_departamentos():
+    try:
+        dispositivos = cargar_dispositivos()
+        departamentos = {
+            str(item.get("departamento", "")).strip()
+            for item in dispositivos
+            if isinstance(item, dict) and str(item.get("departamento", "")).strip()
+        }
+        return jsonify({"success": True, "data": sorted(departamentos, key=str.lower)})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
 
-        # Actualizar cache
-        global maquinas_cache
-        maquinas_cache = data
 
-        agregar_log(f"Machines.json actualizado con {len(data)} máquinas", "success")
-
+@app.route("/api/dispositivos/<dispositivo_id>", methods=["GET"])
+def obtener_dispositivo(dispositivo_id):
+    try:
         return jsonify(
-            {"success": True, "message": f"Se guardaron {len(data)} máquinas"}
+            {"success": True, "data": nocodb.get_dispositivo(dispositivo_id)}
         )
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
+@app.route("/api/dispositivos", methods=["POST"])
+def crear_dispositivo():
+    try:
+        data = request.json or {}
+        ip = str(data.get("ip", "")).strip()
+        nombre = str(data.get("nombre", "")).strip()
+
+        if not ip or not nombre:
+            return jsonify({"error": "Los campos ip y nombre son obligatorios"}), 400
+        if not validar_ip(ip):
+            return jsonify({"error": "IP invalida"}), 400
+
+        payload = {
+            "ip": ip,
+            "nombre": nombre,
+            "departamento": data.get("departamento"),
+        }
+        creado = nocodb.create_dispositivo(payload)
+        cargar_dispositivos()
+        return jsonify({"success": True, "data": creado}), 201
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
+@app.route("/api/dispositivos/<dispositivo_id>", methods=["PUT"])
+def actualizar_dispositivo(dispositivo_id):
+    try:
+        data = request.json or {}
+        payload = {}
+
+        if "ip" in data:
+            ip = str(data.get("ip", "")).strip()
+            if not ip:
+                return jsonify({"error": "El campo ip no puede estar vacio"}), 400
+            if not validar_ip(ip):
+                return jsonify({"error": "IP invalida"}), 400
+            payload["ip"] = ip
+
+        if "nombre" in data:
+            nombre = str(data.get("nombre", "")).strip()
+            if not nombre:
+                return jsonify({"error": "El campo nombre no puede estar vacio"}), 400
+            payload["nombre"] = nombre
+
+        if "departamento" in data:
+            payload["departamento"] = data.get("departamento")
+
+        if not payload:
+            return jsonify({"error": "No se enviaron campos para actualizar"}), 400
+
+        actualizado = nocodb.update_dispositivo(dispositivo_id, payload)
+        cargar_dispositivos()
+        return jsonify({"success": True, "data": actualizado})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
+@app.route("/api/dispositivos/<dispositivo_id>", methods=["DELETE"])
+def eliminar_dispositivo(dispositivo_id):
+    try:
+        nocodb.delete_dispositivo(dispositivo_id)
+        cargar_dispositivos()
+        return jsonify({"success": True, "message": "Dispositivo eliminado"})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
 
 
 @app.route("/api/upload", methods=["POST"])
 def upload_file():
     if "file" not in request.files:
-        return jsonify({"error": "No se envió ningún archivo"}), 400
+        return jsonify({"error": "No se envio ningun archivo"}), 400
+
     file = request.files["file"]
     if file.filename == "":
-        return jsonify({"error": "No se seleccionó ningún archivo"}), 400
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-        file.save(save_path)
-        agregar_log(f"Archivo subido: {filename}", "success")
-        return jsonify({"success": True, "filename": filename, "message": "Archivo subido correctamente"})
-    else:
-        return jsonify({"error": "Nombre de archivo inválido"}), 400
+        return jsonify({"error": "No se selecciono ningun archivo"}), 400
+
+    if not secure_filename(file.filename or ""):
+        return jsonify({"error": "Nombre de archivo invalido"}), 400
+
+    filename = secure_filename(file.filename or "")
+    save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+    file.save(save_path)
+    return jsonify({"success": True, "filename": filename, "message": "Archivo subido"})
 
 
 @app.route("/api/download/<filename>", methods=["GET"])
 def download_file(filename):
-    # Validar que el nombre sea seguro antes de servir el archivo
-    if not allowed_file(filename):
-        return jsonify({"error": "Nombre de archivo inválido"}), 400
+    if not secure_filename(filename):
+        return jsonify({"error": "Nombre de archivo invalido"}), 400
+
     try:
-        return send_from_directory(app.config["UPLOAD_FOLDER"], filename, as_attachment=True)
+        return send_from_directory(
+            app.config["UPLOAD_FOLDER"], filename, as_attachment=True
+        )
     except FileNotFoundError:
         return jsonify({"error": "Archivo no encontrado"}), 404
 
@@ -377,51 +529,18 @@ def download_file(filename):
 def estadisticas():
     return jsonify(
         {
-            "contador": contador_enviados,
-            "historial_total": len(maquinas_cache),
-            "enviando": enviando,
+            "contador": sent_counter,
+            "historial_total": len(cached_devices),
+            "enviando": send_in_progress,
         }
     )
 
 
-@app.route("/api/stream")
-def stream():
-    """Server-Sent Events para actualizaciones en tiempo real"""
-
-    def event_stream():
-        contador_heartbeat = 0
-        while True:
-            try:
-                # Obtener log de la cola
-                log_item = log_queue.get(timeout=1)
-                yield f"data: {json.dumps(log_item)}\n\n"
-                contador_heartbeat = 0
-            except queue.Empty:
-                # Enviar estadísticas cada 2 segundos (en lugar de solo heartbeat)
-                contador_heartbeat += 1
-                if contador_heartbeat >= 2:
-                    stats = {
-                        "type": "estadisticas",
-                        "contador": contador_enviados,
-                        "historial_total": len(maquinas_cache),
-                        "enviando": enviando,
-                    }
-                    yield f"data: {json.dumps(stats)}\n\n"
-                    contador_heartbeat = 0
-                else:
-                    # Enviar heartbeat
-                    yield f"data: {json.dumps({'heartbeat': True})}\n\n"
-
-    return Response(event_stream(), mimetype="text/event-stream")
-
-
 if __name__ == "__main__":
-    # Cargar máquinas al iniciar
-    maquinas_cache = cargar_maquinas()
-    print("🚀 Servidor web iniciado en http://localhost:8080")
-    print("📢 Abre tu navegador y ve a esa dirección")
-    print(
-        "💡 Ejecuta discovery_service.py en tu máquina local para actualizar machines.json"
-    )
-    print(f"📚 Máquinas cargadas: {len(maquinas_cache)}")
+    try:
+        cargar_dispositivos()
+    except Exception as exc:
+        print(f"No se pudo conectar a NocoDB al iniciar: {exc}")
+
+    print("Servidor iniciado en http://localhost:8080")
     app.run(host="0.0.0.0", port=8080, debug=False, threaded=True)

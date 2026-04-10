@@ -1,28 +1,64 @@
 // Elementos del DOM
 const btnEnviar = document.getElementById('btnEnviar');
 const btnCancelar = document.getElementById('btnCancelar');
-const btnEditar = document.getElementById('btnEditar');
 const mensaje = document.getElementById('mensaje');
+const departamentoInput = document.getElementById('departamento');
 // const logContainer = document.getElementById('log');
 // const contadorEl = document.getElementById('contador');
 // const historialEl = document.getElementById('historial');
 const archivoInput = document.getElementById('archivo');
 const archivoNombre = document.getElementById('archivo-nombre');
-const adjuntarLabel = document.querySelector('.adjuntar-label');
+const btnQuitarArchivo = document.getElementById('btnQuitarArchivo');
+const MAX_BYTES = 2048;
 
-// Modal
-const modalEditar = document.getElementById('modalEditar');
-const jsonEditor = document.getElementById('jsonEditor');
-const btnGuardar = document.getElementById('btnGuardar');
-const btnCancelarEdicion = document.getElementById('btnCancelarEdicion');
-const btnCerrarModal = document.getElementById('btnCerrarModal');
+function contarBytes(texto) {
+  return new TextEncoder().encode(texto).length;
+}
 
-let eventSource = null;
+function setSendingState(isSending) {
+  btnEnviar.disabled = isSending;
+  btnEnviar.textContent = isSending ? 'Enviando...' : 'Enviar mensaje';
+  btnCancelar.style.display = isSending ? 'block' : 'none';
+
+  if (!isSending) {
+    btnCancelar.disabled = false;
+    btnCancelar.textContent = 'Cancelar envío';
+  }
+}
+
+function cargarDepartamentos() {
+  fetch('/api/departamentos')
+    .then((res) => res.json())
+    .then((data) => {
+      if (!data.success || !Array.isArray(data.data)) {
+        throw new Error(
+          data.error || 'No se pudieron cargar los departamentos',
+        );
+      }
+
+      const departamentos = data.data;
+      for (const departamento of departamentos) {
+        const option = document.createElement('option');
+        option.value = departamento;
+        option.textContent = departamento;
+        departamentoInput.appendChild(option);
+      }
+    })
+    .catch((err) => {
+      mostrarNotificacion(
+        'No se pudieron cargar departamentos: ' + err,
+        'warning',
+      );
+    });
+}
 
 function limpiarFormularioEnvio() {
   mensaje.value = '';
+  departamentoInput.value = '';
   archivoInput.value = '';
   archivoNombre.textContent = 'Ningún archivo seleccionado';
+  archivoNombre.classList.remove('activo');
+  btnQuitarArchivo.style.display = 'none';
   mensaje.focus();
 }
 
@@ -43,144 +79,91 @@ function mostrarNotificacion(mensaje, tipo = 'info', duracion = 4000) {
   }, duracion);
 }
 
-// Manejo del Modal
-function abrirModalEdicion() {
-  fetch('/api/machines')
-    .then((res) => res.json())
-    .then((data) => {
-      jsonEditor.value = JSON.stringify(data, null, 2);
-      modalEditar.classList.add('show');
-    })
-    .catch((err) => {
-      mostrarNotificacion('Error al cargar machines.json: ' + err, 'error');
-    });
-}
-
-function cerrarModalEdicion() {
-  modalEditar.classList.remove('show');
-}
-
-function guardarMachines() {
-  try {
-    const machines = JSON.parse(jsonEditor.value);
-
-    fetch('/api/machines', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(machines),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          mostrarNotificacion('Máquinas guardadas correctamente', 'success');
-          cerrarModalEdicion();
-          // Actualizar contador sin recargar
-          fetch('/api/estadisticas')
-            .then((res) => res.json())
-            .then((stats) => {
-              historialEl.textContent = stats.historial_total;
-            });
-        } else {
-          mostrarNotificacion('Error: ' + data.error, 'error');
-        }
-      })
-      .catch((err) => {
-        mostrarNotificacion('Error al guardar: ' + err, 'error');
-      });
-  } catch (e) {
-    mostrarNotificacion('JSON inválido: ' + e.message, 'error');
-  }
-}
-
-// Event Listeners del Modal
-btnEditar.addEventListener('click', abrirModalEdicion);
-btnCerrarModal.addEventListener('click', cerrarModalEdicion);
-btnCancelarEdicion.addEventListener('click', cerrarModalEdicion);
-btnGuardar.addEventListener('click', guardarMachines);
-
-// Cerrar modal al hacer click fuera
-modalEditar.addEventListener('click', function (e) {
-  if (e.target === modalEditar) {
-    cerrarModalEdicion();
-  }
-});
-
-// Cerrar modal con ESC
-document.addEventListener('keydown', function (e) {
-  if (e.key === 'Escape') {
-    cerrarModalEdicion();
-  }
-});
-
-// SSE y log eliminados
-
 // Enviar mensaje
-btnEnviar.addEventListener('click', function () {
+btnEnviar.addEventListener('click', async function () {
   const mensajeTexto = mensaje.value.trim();
   const archivo = archivoInput.files[0];
+  const departamento = departamentoInput.value.trim();
+  const bytes = contarBytes(mensajeTexto);
 
   if (!mensajeTexto) {
     mostrarNotificacion('Debes escribir un mensaje', 'error');
     return;
   }
 
-  if (archivo) {
-    // Subir archivo primero
-    const formData = new FormData();
-    formData.append('file', archivo);
+  if (bytes > MAX_BYTES) {
+    mostrarNotificacion(
+      `El mensaje supera el limite de ${MAX_BYTES} bytes`,
+      'error',
+    );
+    return;
+  }
 
-    fetch('/api/upload', {
-      method: 'POST',
-      body: formData,
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          mostrarNotificacion('Archivo subido correctamente', 'success');
-          // Enviar mensaje junto con nombre del archivo
-          enviarMensaje(mensajeTexto, data.filename);
-        } else {
-          mostrarNotificacion('Error al subir archivo: ' + data.error, 'error');
-        }
-      })
-      .catch((err) => {
-        mostrarNotificacion('Error al subir archivo: ' + err, 'error');
+  setSendingState(true);
+
+  if (archivo) {
+    try {
+      // Subir archivo primero
+      const formData = new FormData();
+      formData.append('file', archivo);
+
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
       });
+      const uploadData = await uploadRes.json();
+
+      if (!uploadData.success) {
+        mostrarNotificacion(
+          'Error al subir archivo: ' +
+            (uploadData.error || 'Error desconocido'),
+          'error',
+        );
+        return;
+      }
+
+      mostrarNotificacion('Archivo subido correctamente', 'success');
+      await enviarMensaje(mensajeTexto, uploadData.filename, departamento);
+    } catch (err) {
+      mostrarNotificacion('Error al subir archivo: ' + err, 'error');
+    } finally {
+      setSendingState(false);
+    }
   } else {
-    // Solo enviar mensaje
-    enviarMensaje(mensajeTexto);
+    try {
+      // Solo enviar mensaje
+      await enviarMensaje(mensajeTexto, null, departamento);
+    } finally {
+      setSendingState(false);
+    }
   }
 });
 
-function enviarMensaje(mensaje, archivoNombre = null) {
+async function enviarMensaje(mensaje, archivoNombre = null, departamento = '') {
   const payload = { mensaje };
   if (archivoNombre) {
     payload.archivo = archivoNombre;
   }
-  fetch('/api/enviar', {
+  if (departamento) {
+    payload.departamento = departamento;
+  }
+  const res = await fetch('/api/enviar', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.success) {
-        mostrarNotificacion('Mensaje enviado correctamente', 'success');
-        limpiarFormularioEnvio();
-        setTimeout(() => {
-          window.location.reload();
-        }, 800);
-      } else {
-        mostrarNotificacion('Error: ' + (data.error || data.message), 'error');
-      }
-    })
-    .catch((err) => {
-      mostrarNotificacion('Error al enviar mensaje: ' + err, 'error');
-    });
+  });
+
+  const data = await res.json();
+  if (data.success) {
+    const detalle = departamento ? ` a ${departamento}` : '';
+    mostrarNotificacion('Mensaje enviado correctamente' + detalle, 'success');
+    limpiarFormularioEnvio();
+    return;
+  }
+
+  mostrarNotificacion('Error: ' + (data.error || data.message), 'error');
 }
 
 // Cancelar envío
@@ -211,12 +194,24 @@ btnCancelar.addEventListener('click', async function () {
 
 // Focus en el textarea al cargar
 mensaje.focus();
+cargarDepartamentos();
 
 // Actualizar el nombre del archivo seleccionado
 archivoInput.addEventListener('change', function () {
   if (archivoInput.files.length > 0) {
     archivoNombre.textContent = archivoInput.files[0].name;
+    archivoNombre.classList.add('activo');
+    btnQuitarArchivo.style.display = 'inline-flex';
   } else {
     archivoNombre.textContent = 'Ningún archivo seleccionado';
+    archivoNombre.classList.remove('activo');
+    btnQuitarArchivo.style.display = 'none';
   }
+});
+
+btnQuitarArchivo.addEventListener('click', function () {
+  archivoInput.value = '';
+  archivoNombre.textContent = 'Ningún archivo seleccionado';
+  archivoNombre.classList.remove('activo');
+  btnQuitarArchivo.style.display = 'none';
 });

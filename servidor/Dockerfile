@@ -49,5 +49,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Usuario no-root
 USER appuser
 
-# Comando por defecto: gunicorn con gevent para SSE
+# Comando por defecto: gunicorn para el servidor Flask
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--worker-class", "gevent", "--workers", "1", "--timeout", "120", "--keep-alive", "5", "--access-logfile", "-", "--error-logfile", "-", "--chdir", "/app/backend", "servidor:app"]
